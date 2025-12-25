@@ -28,72 +28,62 @@ export default function OCRProcessor({ imageData, onComplete, onBack }: OCRProce
   };
 
   const processWithGoogleVision = async () => {
-    try {
-      setError(null);
-      setStatus('Google Cloud Vision API 호출 중...');
-      setProgress(20);
+  try {
+    setError(null);
+    setStatus('Google Cloud Vision API 호출 중...');
+    setProgress(20);
 
-      const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY || '';
-      
-      // base64 이미지에서 헤더 제거
-      const base64Image = imageData.replace(/^data:image\/(png|jpeg|jpg);base64,/, '');
-      
-      const response = await fetch(
-        `https://vision.googleapis.com/v1/images:annotate?key=${API_KEY}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            requests: [
-              {
-                image: {
-                  content: base64Image,
-                },
-                features: [
-                  {
-                    type: 'DOCUMENT_TEXT_DETECTION',
-                    maxResults: 1,
-                  },
-                ],
-                imageContext: {
-                  languageHints: ['ko', 'en'],
-                },
-              },
-            ],
-          }),
-        }
-      );
+    console.log('Google Vision API 호출 시작...');
+    
+    // 서버 API Route를 통해 호출
+    const response = await fetch('/api/vision', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        imageData: imageData,
+      }),
+    });
 
-      setProgress(60);
-      setStatus('텍스트 분석 중...');
-
-      const result = await response.json();
-      
-      if (result.responses && result.responses[0].fullTextAnnotation) {
-        const text = result.responses[0].fullTextAnnotation.text;
-        console.log('Google Vision 인식 텍스트:', text);
-        
-        setProgress(90);
-        setStatus('정보 추출 중...');
-        
-        const extractedData = extractBusinessCardInfo(text);
-        
-        setProgress(100);
-        setTimeout(() => {
-          onComplete(extractedData);
-        }, 500);
-      } else {
-        throw new Error('텍스트를 인식할 수 없습니다.');
-      }
-    } catch (err) {
-      console.error('Google Vision Error:', err);
-      setError('Google Vision API 오류. Tesseract로 재시도합니다...');
-      setUseGoogleVision(false);
-      setTimeout(() => processWithTesseract(), 1000);
+    console.log('Google Vision API 응답 상태:', response.status);
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Google Vision API 에러:', errorData);
+      throw new Error(`API 오류: ${response.status}`);
     }
-  };
+
+    setProgress(60);
+    setStatus('텍스트 분석 중...');
+
+    const result = await response.json();
+    console.log('Google Vision 결과:', result);
+    
+    if (result.responses && result.responses[0].fullTextAnnotation) {
+      const text = result.responses[0].fullTextAnnotation.text;
+      console.log('Google Vision 인식 텍스트:', text);
+      
+      setProgress(90);
+      setStatus('정보 추출 중...');
+      
+      const extractedData = extractBusinessCardInfo(text);
+      
+      setProgress(100);
+      setTimeout(() => {
+        onComplete(extractedData);
+      }, 500);
+    } else {
+      throw new Error('텍스트를 인식할 수 없습니다.');
+    }
+  } catch (err: any) {
+    console.error('Google Vision Error:', err);
+    console.log('Tesseract로 전환합니다...');
+    setError('Google Vision API 오류. Tesseract로 재시도합니다...');
+    setUseGoogleVision(false);
+    setTimeout(() => processWithTesseract(), 1000);
+  }
+};
 
   const processWithTesseract = async () => {
   try {
