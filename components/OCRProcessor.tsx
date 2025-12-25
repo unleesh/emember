@@ -98,21 +98,15 @@ export default function OCRProcessor({ imageData, onComplete, onBack }: OCRProce
   const processWithTesseract = async () => {
   try {
     setError(null);
-    setStatus('이미지 전처리 중...');
-    setProgress(5);
-
-    // 이미지 3배 확대 + 선명도 향상
-    const enhancedImage = await enhanceImageForOCR(imageData);
-    
     setStatus('Tesseract 엔진 로딩 중...');
-    setProgress(15);
+    setProgress(10);
 
     const Tesseract = await import('tesseract.js');
     
     const worker = await Tesseract.createWorker(['kor', 'eng'], 1, {
       logger: (m: any) => {
         if (m.status === 'recognizing text') {
-          const ocrProgress = Math.round(m.progress * 70) + 20;
+          const ocrProgress = Math.round(m.progress * 80) + 10;
           setProgress(ocrProgress);
           setStatus(`텍스트 인식 중... ${ocrProgress}%`);
         }
@@ -122,14 +116,9 @@ export default function OCRProcessor({ imageData, onComplete, onBack }: OCRProce
       corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.0.0/tesseract-core.wasm.js',
     });
 
-    // 더 나은 파라미터 설정
-    await worker.setParameters({
-      tessedit_pageseg_mode: '6', // Uniform block of text
-      preserve_interword_spaces: '1',
-    });
-
+    // setParameters 제거 - 기본 설정 사용
     setStatus('명함 이미지 분석 중...');
-    const { data: { text } } = await worker.recognize(enhancedImage);
+    const { data: { text } } = await worker.recognize(imageData);
     
     setProgress(95);
     setStatus('정보 추출 중...');
