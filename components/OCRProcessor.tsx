@@ -176,6 +176,7 @@ const enhanceImageForOCR = async (imageData: string): Promise<string> => {
 };
 
   const extractBusinessCardInfo = (text: string): BusinessCardData => {
+    
   const lines = text.split('\n').filter(line => line.trim());
   
   const data: BusinessCardData = {
@@ -188,7 +189,11 @@ const enhanceImageForOCR = async (imageData: string): Promise<string> => {
     website: '',
     rawText: text
   };
-
+  // extractBusinessCardInfo 함수 시작 부분에 추가
+console.log('=== OCR 원본 텍스트 ===');
+console.log(text);
+console.log('=== 줄별 분리 ===');
+lines.forEach((line, i) => console.log(`${i}: "${line}"`));
   // 1. 이메일 추출 (가장 확실한 패턴)
   const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/gi;
   const emails = text.match(emailRegex);
@@ -263,30 +268,158 @@ const enhanceImageForOCR = async (imageData: string): Promise<string> => {
     }
   }
 
-  // 6. 한국 이름 추출 (개선된 로직)
-  const koreanSurnames = ['김', '이', '박', '최', '정', '강', '조', '윤', '장', '임', '한', '오', '서', '신', '권', '황', '안', '송', '류', '전'];
+// 6. 한국 이름 추출 (개선된 로직 - 모든 케이스 대응)
+const koreanSurnames = ['김', '이', '박', '최', '정', '강', '조', '윤', '장', '임', '한', '오', '서', '신', '권', '황', '안', '송', '류', '전', '홍', '고', '문', '손', '양', '배', '백', '허', '유', '남', '심', '노', '하', '곽', '성', '차', '주', '우', '구', '나', '민', '진', '지', '엄', '원', '채', '천', '방', '공', '현', '함', '변', '염', '여', '추', '도', '소'];
+
+const namesCandidates: { name: string; score: number; lineIndex: number }[] = [];
+
+for (let i = 0; i < Math.min(10, lines.length); i++) {
+  const line = lines[i];
+  const cleaned = line.trim();
   
-  for (const line of lines.slice(0, 8)) { // 상위 8줄 검사
+  // 방법 1: 정확히 한글 2-4글자만
+  if (/^[가-힣]{2,4}$/.test(cleaned)) {
+    let score = 0;
+    
+    if (cleaned.length === 3) score += 10;
+    if (koreanSurnames.slice(0, 10).some(s => cleaned.startsWith(s))) {
+      score += 20;
+    } else if (koreanSurnames.some(s => cleaned.startsWith(s))) {
+      score += 10;
+    }
+    
+    if (companyKeywords.some(k => cleaned.includes(k))) score -= 50;
+    if (positionKeywords.some(k => cleaned.includes(k))) score -= 50;
+    
+    score += (10 - i);
+    
+    if (cleaned === data.company || cleaned === data.position) score -= 30;
+    
+    namesCandidates.push({ name: cleaned, score, lineIndex: i });
+  }
+  
+  // 방법 2: 직책 키워드와 함께
+  const hasPosition = positionKeywords.some(keyword => cleaned.includes(keyword));
+  if (hasPosition) {
+    const parts = cleaned.split(/[\s||\-_]/);
+    
+    for (const part of parts) {
+      const trimmed = part.trim();
+      
+      if (/^[가-힣]{2,4}$/.test(trimmed) && 
+          koreanSurnames.some(s => trimmed.startsWith(s)) &&
+          !positionKeywords.some(k => trimmed.includes(k))) {
+        
+        let score = 15;
+        
+        if (trimmed.length === 3) score += 10;
+        if (koreanSurnames.slice(0, 10).some(s => trimmed.startsWith(s))) {
+          score += 20;
+        }
+        
+        score += (10 - i);
+        
+        namesCandidates.push({ name: trimmed, score, lineIndex: i });
+        console.log('직책과 함께 발견된 이름:', trimmed, '점수:', score);
+      }
+    }
+  }
+  
+  // 방법 3: 회사명 키워드와 함께
+  const hasCompany = companyKeywords.some(keyword => cleaned.includes(keyword));
+  if (hasCompany) {
+    const parts = cleaned.split(/[\s||\-_()]/);
+    
+    for (const part of parts) {
+      const trimmed = part.trim();
+      
+      if (/^[가-힣]{2,4}$/.test(trimmed) && 
+          koreanSurnames.some(s => trimmed.startsWith(s)) &&
+          !companyKeywords.some(k => trimmed.includes(k))) {
+        
+        let score = 12;
+        
+        if (trimmed.length === 3) score += 10;
+        if (koreanSurnames.slice(0, 10).some(s => trimmed.startsWith(s))) {
+          score += 20;
+        }
+        
+        namesCandidates.push({ name: trimmed, score, lineIndex: i });
+        console.log('회사명과 함께 발견된 이름:', trimmed, '점수:', score);
+      }
+    }
+  }
+  
+  // 방법 4: 한글 + 영문 이름 혼합 (NEW!)
+  // "양희연 H.Hailey Yang" → "양희연"
+  const koreanNamePattern = /([가-힣]{2,4})\s+[A-Z]/;
+  const match = cleaned.match(koreanNamePattern);
+  
+  if (match) {
+    const koreanName = match[1];
+    
+    if (koreanSurnames.some(s => koreanName.startsWith(s))) {
+      let score = 18; // 영문과 함께 = 신뢰도 매우 높음
+      
+      if (koreanName.length === 3) score += 10;
+      if (koreanSurnames.slice(0, 10).some(s => koreanName.startsWith(s))) {
+        score += 20;
+      }
+      
+      score += (10 - i);
+      
+      namesCandidates.push({ name: koreanName, score, lineIndex: i });
+      console.log('영문과 함께 발견된 한글 이름:', koreanName, '점수:', score);
+    }
+  }
+  
+  // 방법 5: 공백 없이 붙은 경우 (NEW!)
+  // "양희연H.Hailey" 
+  const widePattern = /([가-힣]{2,4})[\s\t]*[A-Z.]/;
+  const wideMatch = cleaned.match(widePattern);
+  
+  if (wideMatch && !match) {
+    const koreanName = wideMatch[1];
+    
+    if (koreanSurnames.some(s => koreanName.startsWith(s))) {
+      let score = 16;
+      
+      if (koreanName.length === 3) score += 10;
+      if (koreanSurnames.slice(0, 10).some(s => koreanName.startsWith(s))) {
+        score += 20;
+      }
+      
+      namesCandidates.push({ name: koreanName, score, lineIndex: i });
+      console.log('영문과 붙어있는 한글 이름:', koreanName, '점수:', score);
+    }
+  }
+}
+
+// 점수가 가장 높은 이름 선택
+if (namesCandidates.length > 0) {
+  namesCandidates.sort((a, b) => b.score - a.score);
+  const bestCandidate = namesCandidates[0];
+  
+  console.log('이름 후보들:', namesCandidates);
+  
+  if (bestCandidate.score > 0) {
+    data.name = bestCandidate.name;
+    console.log('✅ 선택된 이름:', bestCandidate.name, '점수:', bestCandidate.score);
+  }
+}
+
+// 한글 이름을 못 찾았으면 영문 이름 찾기
+if (!data.name) {
+  for (const line of lines.slice(0, 10)) {
     const cleaned = line.trim();
     
-    // 한국 이름 패턴 (2-4글자, 한글만)
-    const isKoreanName = 
-      /^[가-힣]{2,4}$/.test(cleaned) && // 한글 2-4자
-      koreanSurnames.some(surname => cleaned.startsWith(surname)) && // 흔한 성으로 시작
-      !companyKeywords.some(keyword => cleaned.includes(keyword)) &&
-      !positionKeywords.some(keyword => cleaned.includes(keyword)) &&
-      cleaned !== data.company;
-    
-    // 영문 이름 패턴
-    const isEnglishName = 
-      /^[A-Z][a-z]+\s[A-Z][a-z]+$/.test(cleaned) && // "Firstname Lastname" 형식
-      cleaned.length <= 20;
-    
-    if (isKoreanName || isEnglishName) {
+    if (/^[A-Z][a-z]+\s[A-Z][a-z]+$/.test(cleaned) && cleaned.length <= 20) {
       data.name = cleaned;
+      console.log('영문 이름 발견:', cleaned);
       break;
     }
   }
+}
 
   // 7. 주소 추출 (여러 줄 합치기 - 개선)
   const addressKeywords = ['시', '구', '동', '로', '길', '층', '호', '번지', 'Fl', 'Floor', 'St', 'Street', 'Ave'];

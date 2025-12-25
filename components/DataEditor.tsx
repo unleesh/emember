@@ -4,22 +4,23 @@ import { useState } from 'react';
 import type { BusinessCardData } from '../app/page';
 
 interface DataEditorProps {
-  data: BusinessCardData;
-  onComplete: (data: BusinessCardData) => void;
+  initialData: BusinessCardData;
+  onSave: (data: BusinessCardData) => void;
   onBack: () => void;
 }
 
-export default function DataEditor({ data: initialData, onComplete, onBack }: DataEditorProps) {
+export default function DataEditor({ initialData, onSave, onBack }: DataEditorProps) {
   const [data, setData] = useState<BusinessCardData>(initialData);
-  const [showRawText, setShowRawText] = useState(false);
 
   const handleChange = (field: keyof BusinessCardData, value: string) => {
-    setData(prev => ({ ...prev, [field]: value }));
+    setData(prev => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onComplete(data);
+  const handleSave = () => {
+    onSave(data);
   };
 
   return (
@@ -38,12 +39,12 @@ export default function DataEditor({ data: initialData, onComplete, onBack }: Da
       </div>
 
       {/* 폼 */}
-      <form onSubmit={handleSubmit} className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-6">
         <div className="max-w-2xl mx-auto space-y-4">
           {/* 이름 */}
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">
-              👤 이름 *
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              👤 이름
             </label>
             <input
               type="text"
@@ -51,13 +52,12 @@ export default function DataEditor({ data: initialData, onComplete, onBack }: Da
               onChange={(e) => handleChange('name', e.target.value)}
               className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
               placeholder="홍길동"
-              required
             />
           </div>
 
           {/* 회사명 */}
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               🏢 회사명
             </label>
             <input
@@ -65,13 +65,13 @@ export default function DataEditor({ data: initialData, onComplete, onBack }: Da
               value={data.company}
               onChange={(e) => handleChange('company', e.target.value)}
               className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-              placeholder="(주)회사명"
+              placeholder="회사 이름"
             />
           </div>
 
           {/* 직책 */}
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               💼 직책
             </label>
             <input
@@ -79,13 +79,13 @@ export default function DataEditor({ data: initialData, onComplete, onBack }: Da
               value={data.position}
               onChange={(e) => handleChange('position', e.target.value)}
               className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-              placeholder="부장, 매니저 등"
+              placeholder="대표이사"
             />
           </div>
 
           {/* 이메일 */}
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               📧 이메일
             </label>
             <input
@@ -99,7 +99,7 @@ export default function DataEditor({ data: initialData, onComplete, onBack }: Da
 
           {/* 전화번호 */}
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               📞 전화번호
             </label>
             <input
@@ -113,7 +113,7 @@ export default function DataEditor({ data: initialData, onComplete, onBack }: Da
 
           {/* 주소 */}
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               📍 주소
             </label>
             <input
@@ -127,7 +127,7 @@ export default function DataEditor({ data: initialData, onComplete, onBack }: Da
 
           {/* 웹사이트 */}
           <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               🌐 웹사이트
             </label>
             <input
@@ -139,39 +139,40 @@ export default function DataEditor({ data: initialData, onComplete, onBack }: Da
             />
           </div>
 
-          {/* 원본 텍스트 토글 */}
-          <div className="pt-4 border-t-2 border-gray-200">
-            <button
-              type="button"
-              onClick={() => setShowRawText(!showRawText)}
-              className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-800"
-            >
-              <span>{showRawText ? '▼' : '▶'}</span>
-              <span>인식된 원본 텍스트 보기</span>
-            </button>
-            
-            {showRawText && (
-              <div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono">
-                  {data.rawText}
-                </pre>
-              </div>
-            )}
-          </div>
+          {/* 원본 텍스트 (선택사항) */}
+          {data.rawText && (
+            <div>
+              <button
+                type="button"
+                onClick={() => {
+                  const elem = document.getElementById('rawText');
+                  if (elem) {
+                    elem.classList.toggle('hidden');
+                  }
+                }}
+                className="text-sm text-blue-600 hover:text-blue-800 mb-2"
+              >
+                ▶ 인식된 원본 텍스트 보기
+              </button>
+              <pre
+                id="rawText"
+                className="hidden bg-gray-100 p-4 rounded-lg text-xs overflow-auto max-h-40"
+              >
+                {data.rawText}
+              </pre>
+            </div>
+          )}
         </div>
-      </form>
+      </div>
 
       {/* 하단 버튼 */}
-      <div className="bg-white border-t-2 border-gray-200 p-4 space-y-2">
+      <div className="bg-white p-6 border-t border-gray-200 safe-bottom">
         <button
-          onClick={handleSubmit}
-          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg transition-all active:scale-95"
+          onClick={handleSave}
+          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95"
         >
-          ✓ 확인 완료 - Google Sheets에 저장
+          💾 저장하고 계속
         </button>
-        <p className="text-xs text-gray-500 text-center">
-          💡 정보를 확인하고 수정한 후 저장하세요
-        </p>
       </div>
     </div>
   );
