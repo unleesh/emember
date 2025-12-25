@@ -26,6 +26,57 @@ export default function OCRProcessor({ imageData, onComplete, onBack }: OCRProce
       await processWithTesseract();
     }
   };
+// 이미지 최적화 함수
+const optimizeImageForVision = (imageData: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) {
+        reject(new Error('Canvas context not available'));
+        return;
+      }
+      
+      // 최대 크기 제한
+      const MAX_SIZE = 1600;
+      let width = img.width;
+      let height = img.height;
+      
+      if (width > MAX_SIZE || height > MAX_SIZE) {
+        const ratio = Math.min(MAX_SIZE / width, MAX_SIZE / height);
+        width = Math.floor(width * ratio);
+        height = Math.floor(height * ratio);
+      }
+      
+      canvas.width = width;
+      canvas.height = height;
+      
+      // 고품질 렌더링
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, width, height);
+      
+      // JPEG 80% 품질로 압축
+      const optimized = canvas.toDataURL('image/jpeg', 0.8);
+      
+      console.log('이미지 최적화 완료:', {
+        원본: imageData.length,
+        최적화: optimized.length,
+        크기: `${width}x${height}`
+      });
+      
+      resolve(optimized);
+    };
+    
+    img.onerror = () => {
+      reject(new Error('Failed to load image'));
+    };
+    
+    img.src = imageData;
+  });
+};
 
   const processWithGoogleVision = async () => {
   try {
@@ -33,12 +84,13 @@ export default function OCRProcessor({ imageData, onComplete, onBack }: OCRProce
     setStatus('이미지 최적화 중...');
     setProgress(10);
 
-    // 이미지 크기 줄이기 (Vision API 제한: 4MB)
-    const optimizedImage = await optimizeImage(imageData);
+    // 이미지 최적화
+    const optimizedImage = await optimizeImageForVision(imageData);
     
     setStatus('Google Cloud Vision API 호출 중...');
     setProgress(20);
 
+    console.log('Optimized image size:', optimizedImage.length);
     console.log('Google Vision API 호출 시작...');
     
     const response = await fetch('/api/vision', {
@@ -54,16 +106,15 @@ export default function OCRProcessor({ imageData, onComplete, onBack }: OCRProce
     console.log('Google Vision API 응답 상태:', response.status);
     
     const result = await response.json();
+    console.log('Google Vision API 응답:', result);
     
     if (!response.ok) {
-      console.error('Google Vision API 에러:', result);
-      throw new Error(`API 오류: ${response.status} - ${JSON.stringify(result.details)}`);
+      console.error('Google Vision API 에러 상세:', result);
+      throw new Error(`API 오류: ${response.status} - ${result.message || result.error || 'Unknown'}`);
     }
 
     setProgress(60);
     setStatus('텍스트 분석 중...');
-
-    console.log('Google Vision 결과:', result);
     
     if (result.responses && result.responses[0]?.fullTextAnnotation) {
       const text = result.responses[0].fullTextAnnotation.text;
@@ -78,13 +129,15 @@ export default function OCRProcessor({ imageData, onComplete, onBack }: OCRProce
       setTimeout(() => {
         onComplete(extractedData);
       }, 500);
+    } else if (result.responses && result.responses[0]?.error) {
+      throw new Error(`Vision API Error: ${result.responses[0].error.message}`);
     } else {
       throw new Error('텍스트를 인식할 수 없습니다.');
     }
   } catch (err: any) {
     console.error('Google Vision Error:', err);
     console.log('Tesseract로 전환합니다...');
-    setError('Google Vision API 오류. Tesseract로 재시도합니다...');
+    setError(`Google Vision 실패: ${err.message}. Tesseract로 재시도합니다...`);
     setUseGoogleVision(false);
     setTimeout(() => processWithTesseract(), 1000);
   }
