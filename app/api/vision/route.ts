@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
-  console.log('=== Vision API Route Called ===');
+  const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
+  
+  // 디버깅 로그 (임시)
+  console.log('ENV check:', {
+    keyExists: !!API_KEY,
+    keyLength: API_KEY?.length,
+    firstChars: API_KEY?.substring(0, 10),
+    lastChars: API_KEY?.substring(API_KEY?.length - 10),
+  });
   
   try {
     const body = await request.json();
