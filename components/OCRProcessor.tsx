@@ -30,37 +30,42 @@ export default function OCRProcessor({ imageData, onComplete, onBack }: OCRProce
   const processWithGoogleVision = async () => {
   try {
     setError(null);
+    setStatus('이미지 최적화 중...');
+    setProgress(10);
+
+    // 이미지 크기 줄이기 (Vision API 제한: 4MB)
+    const optimizedImage = await optimizeImage(imageData);
+    
     setStatus('Google Cloud Vision API 호출 중...');
     setProgress(20);
 
     console.log('Google Vision API 호출 시작...');
     
-    // 서버 API Route를 통해 호출
     const response = await fetch('/api/vision', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        imageData: imageData,
+        imageData: optimizedImage,
       }),
     });
 
     console.log('Google Vision API 응답 상태:', response.status);
     
+    const result = await response.json();
+    
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error('Google Vision API 에러:', errorData);
-      throw new Error(`API 오류: ${response.status}`);
+      console.error('Google Vision API 에러:', result);
+      throw new Error(`API 오류: ${response.status} - ${JSON.stringify(result.details)}`);
     }
 
     setProgress(60);
     setStatus('텍스트 분석 중...');
 
-    const result = await response.json();
     console.log('Google Vision 결과:', result);
     
-    if (result.responses && result.responses[0].fullTextAnnotation) {
+    if (result.responses && result.responses[0]?.fullTextAnnotation) {
       const text = result.responses[0].fullTextAnnotation.text;
       console.log('Google Vision 인식 텍스트:', text);
       
@@ -83,6 +88,38 @@ export default function OCRProcessor({ imageData, onComplete, onBack }: OCRProce
     setUseGoogleVision(false);
     setTimeout(() => processWithTesseract(), 1000);
   }
+};
+
+// 이미지 최적화 함수 추가
+const optimizeImage = async (imageData: string): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d')!;
+      
+      // 최대 크기 제한 (1920x1080)
+      const maxWidth = 1920;
+      const maxHeight = 1080;
+      let width = img.width;
+      let height = img.height;
+      
+      if (width > maxWidth || height > maxHeight) {
+        const ratio = Math.min(maxWidth / width, maxHeight / height);
+        width = width * ratio;
+        height = height * ratio;
+      }
+      
+      canvas.width = width;
+      canvas.height = height;
+      
+      ctx.drawImage(img, 0, 0, width, height);
+      
+      // JPEG 압축 (품질 85%)
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.src = imageData;
+  });
 };
 
   const processWithTesseract = async () => {
