@@ -12,8 +12,12 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
+    const checkMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    setIsMobile(checkMobile);
+    
     let stream: MediaStream | null = null;
 
     async function setupCamera() {
@@ -21,13 +25,16 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
         setError(null);
         setIsReady(false);
 
-        stream = await navigator.mediaDevices.getUserMedia({
+        const constraints = {
           video: {
-            facingMode: 'environment',
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
+            facingMode: { ideal: 'environment' },
+            width: { ideal: isMobile ? 1920 : 1280 },
+            height: { ideal: isMobile ? 1080 : 720 },
+            aspectRatio: { ideal: 16/9 }
           }
-        });
+        };
+
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
@@ -74,9 +81,10 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // 좌우반전 해제 (원본 그대로 저장)
     ctx.save();
-    ctx.scale(1, 1);  // 반전 없이 원본 그대로
+    if (!isMobile) {
+      ctx.scale(1, 1);
+    }
     ctx.drawImage(video, 0, 0);
     ctx.restore();
 
@@ -86,10 +94,10 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
 
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col">
-      {/* 헤더 */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-4 flex items-center justify-between">
+      {/* 헤더 - 고정 */}
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-4 flex items-center justify-between flex-shrink-0 safe-area-top">
         <h2 className="text-white text-lg font-bold flex items-center gap-2">
-          📷 카메라 설정 확인
+          📷 명함 촬영
         </h2>
         <button
           onClick={onClose}
@@ -99,23 +107,26 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
         </button>
       </div>
 
-      {/* 상태 정보 */}
-      <div className="bg-blue-50 p-3 border-b border-blue-200">
-        <p className="text-sm">
-          권한 상태: {error ? '❌ 거부됨' : isReady ? '✅ 카메라 권한이 허용되었습니다.' : '⏳ 카메라 준비 중...'}
+      {/* 상태 표시 - 고정 */}
+      <div className="bg-blue-50 p-3 border-b border-blue-200 flex-shrink-0">
+        <p className="text-sm text-center">
+          {error ? '❌ 카메라 접근 실패' : isReady ? '✅ 준비 완료' : '⏳ 카메라 준비 중...'}
         </p>
-        {videoRef.current && (
-          <p className="text-xs text-gray-600 mt-1">
-            감지된 카메라: {videoRef.current.videoWidth}x{videoRef.current.videoHeight || '준비 중...'}
+        {isReady && (
+          <p className="text-xs text-gray-600 text-center mt-1">
+            {isMobile ? '📱 후면 카메라' : '💻 웹캠'}
           </p>
         )}
       </div>
 
-      {/* 카메라 프리뷰 */}
-      <div className="flex-1 relative bg-gray-900 flex items-center justify-center">
+      {/* 카메라 프리뷰 - 가변 */}
+      <div className="flex-1 relative bg-gray-900 flex items-center justify-center overflow-hidden min-h-0">
         {error ? (
           <div className="text-center p-4">
             <p className="text-red-400 mb-4">{error}</p>
+            <p className="text-white text-sm mb-4">
+              설정 → Safari/Chrome → 카메라 권한을 확인하세요
+            </p>
             <button
               onClick={onClose}
               className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700"
@@ -136,7 +147,7 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
                 width: '100%',
                 height: '100%',
                 backgroundColor: '#000',
-                transform: 'scaleX(-1)'  // 좌우반전 (미리보기만)
+                transform: isMobile ? 'none' : 'scaleX(-1)'
               }}
             />
             {!isReady && (
@@ -147,26 +158,45 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
                 </div>
               </div>
             )}
+            
+            {/* 명함 가이드 오버레이 */}
+            {isReady && (
+              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                <div 
+                  className="border-2 border-white rounded-lg shadow-lg"
+                  style={{
+                    width: '85%',
+                    height: '55%',
+                    maxWidth: '400px',
+                    maxHeight: '250px',
+                  }}
+                >
+                  <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black/70 text-white px-3 py-1 rounded text-sm whitespace-nowrap">
+                    명함을 이 영역에 맞춰주세요
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
 
-      {/* 캡처 버튼 */}
+      {/* 촬영 버튼 - 고정 하단 */}
       {!error && (
-        <div className="bg-white p-4 border-t border-gray-200">
+        <div className="bg-black/80 backdrop-blur-sm p-4 sm:p-6 border-t border-gray-700 flex-shrink-0 safe-area-bottom">
           <button
             onClick={captureImage}
             disabled={!isReady}
-            className={`w-full py-4 rounded-lg font-bold text-white transition-all ${
+            className={`w-full py-4 sm:py-5 rounded-2xl font-bold text-white transition-all text-lg ${
               isReady
-                ? 'bg-red-600 hover:bg-red-700 active:scale-95'
-                : 'bg-gray-400 cursor-not-allowed'
+                ? 'bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 active:scale-95 shadow-lg hover:shadow-xl'
+                : 'bg-gray-600 cursor-not-allowed'
             }`}
           >
-            {isReady ? '📷 카메라 촬영' : '⏳ 카메라 준비 중...'}
+            {isReady ? '📷 촬영하기' : '⏳ 준비 중...'}
           </button>
-          <p className="text-xs text-gray-500 text-center mt-2">
-            💡 명함이 화면에 잘 보이도록 조정 후 촬영해주세요
+          <p className="text-xs text-gray-400 text-center mt-3">
+            💡 명함 전체가 잘 보이도록 촬영하세요
           </p>
         </div>
       )}
