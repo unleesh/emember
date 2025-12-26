@@ -1,16 +1,6 @@
 import { google } from 'googleapis';
 import { NextRequest, NextResponse } from 'next/server';
 
-const auth = new google.auth.GoogleAuth({
-  credentials: {
-    client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-    private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-  },
-  scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-});
-
-const sheets = google.sheets({ version: 'v4', auth });
-
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
@@ -22,6 +12,34 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Private key 디코딩 개선
+    let privateKey = process.env.GOOGLE_PRIVATE_KEY;
+    
+    if (!privateKey) {
+      return NextResponse.json(
+        { error: 'Private key not configured' },
+        { status: 500 }
+      );
+    }
+
+    // Vercel 환경 변수에서 줄바꿈이 이스케이프된 경우 처리
+    privateKey = privateKey.replace(/\\n/g, '\n');
+    
+    // 혹시 따옴표로 감싸져 있는 경우 제거
+    if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+      privateKey = privateKey.slice(1, -1).replace(/\\n/g, '\n');
+    }
+
+    const auth = new google.auth.GoogleAuth({
+      credentials: {
+        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        private_key: privateKey,
+      },
+      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+    });
+
+    const sheets = google.sheets({ version: 'v4', auth });
 
     // 기존 데이터 확인
     const getResponse = await sheets.spreadsheets.values.get({
@@ -68,9 +86,14 @@ export async function POST(request: NextRequest) {
       success: true, 
       url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`
     });
-
   } catch (error: any) {
     console.error('Sheets API Error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code
+    });
+    
     return NextResponse.json(
       { error: error.message || 'Failed to save data' },
       { status: 500 }
