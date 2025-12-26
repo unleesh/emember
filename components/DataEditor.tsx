@@ -24,9 +24,9 @@ export default function DataEditor({ initialData, onSave, onBack }: DataEditorPr
   };
 
   return (
-    <div className="h-full flex flex-col bg-white">
-      {/* 헤더 */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-4 flex items-center gap-3">
+    <div className="fixed inset-0 bg-white flex flex-col">
+      {/* 헤더 - 고정 */}
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-4 flex items-center gap-3 flex-shrink-0 safe-area-top">
         <button
           onClick={onBack}
           className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
@@ -38,8 +38,8 @@ export default function DataEditor({ initialData, onSave, onBack }: DataEditorPr
         </h2>
       </div>
 
-      {/* 폼 */}
-      <div className="flex-1 overflow-auto p-6">
+      {/* 폼 - 가변 (스크롤 가능) */}
+      <div className="flex-1 overflow-auto p-4 sm:p-6 min-h-0">
         <div className="max-w-2xl mx-auto space-y-4">
           {/* 이름 */}
           <div>
@@ -162,11 +162,14 @@ export default function DataEditor({ initialData, onSave, onBack }: DataEditorPr
               </pre>
             </div>
           )}
+
+          {/* 하단 여백 (버튼 높이만큼) */}
+          <div className="h-4"></div>
         </div>
       </div>
 
-      {/* 하단 버튼 */}
-      <div className="bg-white p-6 border-t border-gray-200 safe-bottom">
+      {/* 저장 버튼 - 고정 하단 */}
+      <div className="bg-white p-4 sm:p-6 border-t border-gray-200 flex-shrink-0 safe-area-bottom shadow-lg">
         <button
           onClick={handleSave}
           className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95"
