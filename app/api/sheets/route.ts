@@ -63,6 +63,9 @@ export async function POST(request: NextRequest) {
     }
 
     // 전화번호 중복 체크
+    console.log('=== 중복 체크 시작 ===');
+    console.log('입력된 전화번호:', data.phone);
+
     if (data.phone) {
       // 전화번호 정규화 함수 (비교를 위해 숫자만 추출)
       const normalizePhone = (phone: string): string => {
@@ -70,15 +73,18 @@ export async function POST(request: NextRequest) {
       };
 
       const newPhoneNormalized = normalizePhone(data.phone);
+      console.log('정규화된 새 전화번호:', newPhoneNormalized);
 
       // 기존 전화번호 데이터 읽기 (F열 - 전화번호 컬럼, 헤더 제외)
       if (existingRows > 1) {
+        console.log('기존 행 수:', existingRows);
         const phoneResponse = await sheets.spreadsheets.values.get({
           spreadsheetId,
           range: 'Sheet1!F2:F',
         });
 
         const existingPhones = phoneResponse.data.values || [];
+        console.log('F열에서 읽은 전화번호들:', JSON.stringify(existingPhones, null, 2));
 
         // 기존 전화번호 중 중복이 있는지 확인
         for (let i = 0; i < existingPhones.length; i++) {
@@ -88,7 +94,10 @@ export async function POST(request: NextRequest) {
             const cleanPhone = existingPhone.replace(/^'/, '');
             const existingPhoneNormalized = normalizePhone(cleanPhone);
 
+            console.log(`${i + 2}행 비교: "${cleanPhone}" -> "${existingPhoneNormalized}" vs "${newPhoneNormalized}"`);
+
             if (existingPhoneNormalized === newPhoneNormalized) {
+              console.log('🚨 중복 발견!');
               return NextResponse.json(
                 {
                   error: '중복된 전화번호입니다',
@@ -101,7 +110,12 @@ export async function POST(request: NextRequest) {
             }
           }
         }
+        console.log('✅ 중복 없음 - 저장 진행');
+      } else {
+        console.log('첫 번째 데이터 - 중복 체크 생략');
       }
+    } else {
+      console.log('⚠️ 전화번호가 없음 - 중복 체크 생략');
     }
 
     // 데이터 저장
