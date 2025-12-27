@@ -62,6 +62,48 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // 전화번호 중복 체크
+    if (data.phone) {
+      // 전화번호 정규화 함수 (비교를 위해 숫자만 추출)
+      const normalizePhone = (phone: string): string => {
+        return phone.replace(/[^0-9]/g, '');
+      };
+
+      const newPhoneNormalized = normalizePhone(data.phone);
+
+      // 기존 전화번호 데이터 읽기 (F열 - 전화번호 컬럼, 헤더 제외)
+      if (existingRows > 1) {
+        const phoneResponse = await sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range: 'Sheet1!F2:F',
+        });
+
+        const existingPhones = phoneResponse.data.values || [];
+
+        // 기존 전화번호 중 중복이 있는지 확인
+        for (let i = 0; i < existingPhones.length; i++) {
+          const existingPhone = existingPhones[i]?.[0];
+          if (existingPhone) {
+            // 스프레드시트에 저장된 전화번호는 앞에 ' 가 붙어있을 수 있음
+            const cleanPhone = existingPhone.replace(/^'/, '');
+            const existingPhoneNormalized = normalizePhone(cleanPhone);
+
+            if (existingPhoneNormalized === newPhoneNormalized) {
+              return NextResponse.json(
+                {
+                  error: '중복된 전화번호입니다',
+                  message: `이 전화번호(${data.phone})는 이미 등록되어 있습니다. (${i + 2}번째 행)`,
+                  duplicate: true,
+                  existingRow: i + 2
+                },
+                { status: 409 }
+              );
+            }
+          }
+        }
+      }
+    }
+
     // 데이터 저장
     const timestamp = new Date().toLocaleString('ko-KR');
     const values = [[
