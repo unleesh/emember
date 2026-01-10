@@ -254,11 +254,43 @@ const enhanceImageForOCR = async (imageData: string): Promise<string> => {
     img.src = imageData;
   });
 };
+// 전화번호 정리 함수
+const formatPhoneNumber = (phone: string): string => {
+  // 공백과 특수문자 정리
+  let cleaned = phone.trim();
+  
+  // 미국 번호 표준화 (XXX-XXX-XXXX 또는 +1-XXX-XXX-XXXX)
+  const usMatch = cleaned.match(/\+?1?[\s.-]?\(?(\d{3})\)?[\s.-]?(\d{3})[\s.-]?(\d{4})/);
+  if (usMatch) {
+    const hasCountryCode = cleaned.includes('+1') || cleaned.startsWith('1');
+    if (hasCountryCode) {
+      return `+1-${usMatch[1]}-${usMatch[2]}-${usMatch[3]}`;
+    }
+    return `${usMatch[1]}-${usMatch[2]}-${usMatch[3]}`;
+  }
+  
+  // 한국 번호 표준화 (010-XXXX-XXXX)
+  const krMatch = cleaned.match(/0?1[0-9][\s-]?(\d{3,4})[\s-]?(\d{4})/);
+  if (krMatch) {
+    const fullNumber = cleaned.replace(/[^\d]/g, '');
+    if (fullNumber.length === 10) {
+      return `${fullNumber.slice(0, 3)}-${fullNumber.slice(3, 6)}-${fullNumber.slice(6)}`;
+    } else if (fullNumber.length === 11) {
+      return `${fullNumber.slice(0, 3)}-${fullNumber.slice(3, 7)}-${fullNumber.slice(7)}`;
+    }
+  }
+  
+  return cleaned;
+};
 
   const extractBusinessCardInfo = (text: string): BusinessCardData => {
-    
-  const lines = text.split('\n').filter(line => line.trim());
+  console.log('=== OCR 원본 텍스트 ===');
+  console.log(text);
   
+  const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+  console.log('=== 줄별 분리 ===');
+  lines.forEach((line, i) => console.log(`${i}: "${line}"`));
+
   const data: BusinessCardData = {
     name: '',
     company: '',
@@ -269,89 +301,254 @@ const enhanceImageForOCR = async (imageData: string): Promise<string> => {
     website: '',
     rawText: text
   };
-  // extractBusinessCardInfo 함수 시작 부분에 추가
-console.log('=== OCR 원본 텍스트 ===');
-console.log(text);
-console.log('=== 줄별 분리 ===');
-lines.forEach((line, i) => console.log(`${i}: "${line}"`));
-  // 1. 이메일 추출 (가장 확실한 패턴)
-  const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/gi;
-  const emails = text.match(emailRegex);
+
+  // Keywords for detection
+  const companyKeywords = ['주식회사', '(주)', '㈜', '회사', 'company', 'corp', 'corporation', 'inc', 'llc', 'llp', 'ltd', 'limited', 'co.', '&', 'group', 'partners', 'associates'];
+  const positionKeywords = ['대표', '이사', '부장', '과장', '팀장', '사원', '매니저', 'manager', 'director', 'ceo', 'cto', 'cfo', 'president', 'vp', 'vice president', 'chief', 'head', 'lead', 'senior', 'junior', 'associate', 'partner', 'counsel', '변호사', '회계사', '세무사', '교수', 'professor', 'dr.', 'attorney', 'lawyer', 'consultant'];
+
+  // 1. 이메일 추출
+  const emailPattern = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+  const emails = text.match(emailPattern);
   if (emails && emails.length > 0) {
-    data.email = emails[0].toLowerCase();
+    data.email = emails[0];
+    console.log('이메일 발견:', data.email);
   }
 
-  // 2. 전화번호 추출
-  const phoneRegex = /(\+?82[-.\s]?)?0?1[0-9][-.\s]?\d{3,4}[-.\s]?\d{4}|0\d{1,2}[-.\s]?\d{3,4}[-.\s]?\d{4}/g;
-  const phones = text.match(phoneRegex);
-  if (phones && phones.length > 0) {
-    data.phone = phones[0].replace(/\s+/g, '-');
-  }
-
-  // 3. 웹사이트 추출 (URL 우선, 없으면 이메일 도메인)
-  const urlRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+\.[a-z]{2,})/gi;
-  const urls = text.match(urlRegex);
-  if (urls && urls.length > 0) {
-    data.website = urls[0];
-    if (!data.website.startsWith('http')) {
-      data.website = 'https://' + data.website;
-    }
-  } else if (data.email) {
-    // URL이 없으면 이메일 도메인 사용
-    const domain = data.email.split('@')[1];
-    if (domain && !domain.includes('gmail') && !domain.includes('naver') && !domain.includes('kakao')) {
-      data.website = 'https://' + domain;
-    }
-  }
-
-  // 4. 직책 추출 (대표, CEO 등)
-  const positionKeywords = [
-    '대표이사', '대표', '부대표', 'CEO', 'CTO', 'CFO', 'COO', 'CMO',
-    '회장', '사장', '부사장', '이사', '본부장', '부장', '차장', '과장', '팀장', 
-    '매니저', '주임', '사원', 'President', 'Director', 'Manager', 'Chief', 
-    'Head', 'Lead', 'Senior', 'Junior', 'Executive', 'Officer'
+  // 2. 웹사이트 추출
+  const websitePatterns = [
+    /(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\.[a-zA-Z]{2,})?)/gi,
+    /(?:www\.)?([a-zA-Z0-9-]+\.(?:com|net|org|co\.kr|kr))/gi,
   ];
   
-  for (const line of lines) {
-    const cleaned = line.trim();
-    // 직책 키워드가 있고, 짧고, 숫자/이메일 없는 경우
-    if (positionKeywords.some(keyword => cleaned.includes(keyword)) && 
-        cleaned.length < 30 &&
-        !cleaned.includes('@') &&
-        !cleaned.match(/\d{3,}/)) {
-      data.position = cleaned;
+  for (const pattern of websitePatterns) {
+    const websites = text.match(pattern);
+    if (websites && websites.length > 0) {
+      let website = websites[0];
+      if (!website.startsWith('http')) {
+        website = 'https://' + website;
+      }
+      data.website = website;
+      console.log('웹사이트 발견:', data.website);
       break;
     }
   }
 
-  // 5. 회사명 추출
-  const companyKeywords = [
-    '주식회사', '(주)', 'Co.,Ltd', 'Co., Ltd', 'Corp', 'Corporation', 
-    'Inc', 'Company', 'Group', 'Partners', 'Ltd', 'LLC', 'Lab'
-  ];
+  // 3. 회사명 추출 (개선됨 - 영문 회사명 포함)
+  // 3. 회사명 추출 (개선됨 - 이메일 도메인 활용)
+const companyPatterns = [
+  // 영문 회사명 (대문자로 시작, & 포함 가능)
+  /^[A-Z][A-Z\s&]+(?:LLC|LLP|INC|CORP|CO\.|LTD|LIMITED|PARTNERS|GROUP)?$/,
+  // 한글 회사명
+  /^[가-힣\s]+(?:주식회사|회사|\(주\)|㈜)$/,
+];
+
+// 이메일에서 회사명 추출 시도
+let companyFromEmail = '';
+if (data.email) {
+  // 이메일 도메인에서 회사명 추출 (예: kairos@lawmission.net → lawmission)
+  const emailMatch = data.email.match(/@([a-zA-Z0-9-]+)\./);
+  if (emailMatch) {
+    const domain = emailMatch[1];
+    // 도메인을 회사명으로 변환 (첫 글자 대문자)
+    companyFromEmail = domain.charAt(0).toUpperCase() + domain.slice(1);
+    console.log('이메일에서 회사명 추출:', companyFromEmail);
+  }
+}
+
+// 상위 10줄에서 회사명 찾기
+for (let i = 0; i < Math.min(10, lines.length); i++) {
+  const line = lines[i];
+  const upperLine = line.toUpperCase();
+  const lowerLine = line.toLowerCase();
   
-  for (const line of lines) {
-    const cleaned = line.trim();
+  // 영문 대문자 회사명 (예: WHITE & CASE, MISSION)
+  if (/^[A-Z][A-Z\s&]+$/.test(line) && line.length >= 3 && line.length <= 50) {
+    // 이미 이메일이나 웹사이트가 아닌지 확인
+    if (!line.includes('@') && !line.includes('.com') && !line.includes('http')) {
+      // 이메일 도메인과 매칭되는지 확인
+      if (companyFromEmail && line.toUpperCase().includes(companyFromEmail.toUpperCase())) {
+        data.company = line;
+        console.log('영문 회사명 발견 (이메일 도메인 매칭):', line);
+        break;
+      } else if (!data.company) {
+        // 일단 후보로 저장
+        data.company = line;
+        console.log('영문 회사명 후보 (대문자):', line);
+      }
+    }
+  }
+  
+  // 이메일 도메인과 유사한 단어 찾기
+  if (companyFromEmail) {
+    const words = line.split(/[\s,.\-_]+/);
+    for (const word of words) {
+      // 대소문자 무시하고 비교
+      if (word.length >= 3 && 
+          word.toLowerCase() === companyFromEmail.toLowerCase()) {
+        // 정확히 매칭되는 경우
+        data.company = word;
+        console.log('이메일 도메인과 정확히 매칭:', word);
+        break;
+      } else if (word.length >= 4 && 
+                 companyFromEmail.toLowerCase().includes(word.toLowerCase())) {
+        // 도메인에 포함된 경우 (예: mission in lawmission)
+        if (!data.company || data.company.length < word.length) {
+          data.company = word;
+          console.log('이메일 도메인에 포함된 단어:', word);
+        }
+      }
+    }
+    if (data.company) break;
+  }
+  
+  // 회사 키워드 포함
+  if (companyKeywords.some(keyword => lowerLine.includes(keyword.toLowerCase()))) {
+    if (!data.company) {
+      data.company = line;
+      console.log('키워드로 회사명 발견:', line);
+    }
+  }
+}
+
+// 이메일에서 추출한 회사명이 있고, 본문에서 매칭되는 회사명을 못 찾았다면
+// 이메일 도메인을 회사명으로 사용
+if (!data.company && companyFromEmail) {
+  // 본문에서 대소문자 무관하게 찾기
+  let foundInText = false;
+  for (let i = 0; i < Math.min(15, lines.length); i++) {
+    const line = lines[i];
+    const upperLine = line.toUpperCase();
     
-    // 회사명 키워드가 있거나, 영문 대문자+소문자 조합 (AI, curi 등)
-    const hasCompanyKeyword = companyKeywords.some(keyword => cleaned.includes(keyword));
-    const isEnglishBrand = /^[A-Za-z\s]+$/.test(cleaned) && cleaned.length >= 3 && cleaned.length <= 30;
+    // MISSION, Mission, mission 등 모두 매칭
+    if (upperLine.includes(companyFromEmail.toUpperCase())) {
+      // 가능하면 원본 대소문자 형태 추출
+      const regex = new RegExp(companyFromEmail, 'gi');
+      const matches = line.match(regex);
+      if (matches && matches.length > 0) {
+        data.company = matches[0];
+        console.log('이메일 도메인으로 회사명 발견 (대소문자 보존):', matches[0]);
+        foundInText = true;
+        break;
+      }
+    }
+  }
+  
+  // 그래도 못 찾았으면 이메일 도메인 자체를 사용
+  if (!foundInText) {
+    data.company = companyFromEmail;
+    console.log('이메일 도메인을 회사명으로 사용:', companyFromEmail);
+  }
+}
+
+console.log('최종 회사명:', data.company);
+
+  // 4. 전화번호 추출 (국제 번호 포함)
+  const phonePatterns = [
+    // 한국 번호
+    /(\+?82[\s-]?)?0?1[0-9][\s-]?\d{3,4}[\s-]?\d{4}/g,
+    /(\+?82[\s-]?)?0\d{1,2}[\s-]?\d{3,4}[\s-]?\d{4}/g,
     
-    if ((hasCompanyKeyword || isEnglishBrand) &&
-        !cleaned.includes('@') && 
-        !cleaned.match(/\d{2,4}[-.\s]\d{3,4}/) &&
-        !cleaned.includes('www.') &&
-        !cleaned.includes('http') &&
-        !positionKeywords.some(keyword => cleaned.includes(keyword))) {
-      data.company = cleaned;
-      break;
+    // 미국 번호
+    /\+?1[\s.-]?\(?(\d{3})\)?[\s.-]?(\d{3})[\s.-]?(\d{4})/g,
+    /\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}/g,
+    
+    // 국제 번호 일반
+    /\+\d{1,3}[\s.-]?\d{1,4}[\s.-]?\d{1,4}[\s.-]?\d{1,9}/g,
+  ];
+
+  const phoneNumbers: string[] = [];
+  phonePatterns.forEach(pattern => {
+    const matches = text.match(pattern);
+    if (matches) {
+      matches.forEach(match => {
+        const cleaned = match.trim();
+        if (cleaned.length >= 10 && cleaned.length <= 20) {
+          phoneNumbers.push(cleaned);
+        }
+      });
+    }
+  });
+
+  const uniquePhones = [...new Set(phoneNumbers)];
+  const sortedPhones = uniquePhones.sort((a, b) => {
+    const aHasPlus = a.startsWith('+');
+    const bHasPlus = b.startsWith('+');
+    if (aHasPlus && !bHasPlus) return -1;
+    if (!aHasPlus && bHasPlus) return 1;
+    return 0;
+  });
+
+  if (sortedPhones.length > 0) {
+    data.phone = sortedPhones[0];
+    console.log('전화번호 발견:', data.phone);
+  }
+
+  // 5. 주소 추출 (미국 주소 포함)
+  const addressPatterns = [
+    // 미국 주소 (Street, City, State ZIP)
+    /\d+\s+[A-Za-z\s]+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Way|Court|Ct|Place|Pl|Square|Sq|Suite|Ste)[,\s]+[A-Za-z\s]+[,\s]+[A-Z]{2}\s+\d{5}(?:-\d{4})?/gi,
+    // Suite, Floor 정보
+    /(?:Suite|Ste|Floor|Fl)[\s#]?\d+/gi,
+    // 미국 주소 간단 버전
+    /\d+\s+[A-Za-z\s]+(?:Real|Camino|Street|Avenue|Road|Boulevard|Drive)[,\s]+/gi,
+    // 한국 주소
+    /[가-힣]+(?:시|도|구|동|로|길)\s*\d+/g,
+    /(?:서울|경기|인천|부산|대구|광주|대전|울산|세종)[^\n]{10,}/g,
+  ];
+
+  const addresses: string[] = [];
+  
+  // 여러 줄을 합쳐서 주소 찾기
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    
+    // 미국 주소 패턴 확인
+    if (/\d+\s+[A-Za-z]/.test(line) && line.length > 10) {
+      // 다음 2-3줄도 주소일 가능성
+      const addressLines = [line];
+      for (let j = i + 1; j < Math.min(i + 3, lines.length); j++) {
+        const nextLine = lines[j];
+        // State, ZIP code, Suite 등이 있으면 주소의 일부
+        if (/(?:Suite|Floor|CA|NY|TX|MA|IL|WA|[A-Z]{2}\s+\d{5})/i.test(nextLine)) {
+          addressLines.push(nextLine);
+        } else if (nextLine.length < 5 || /^[가-힣]+$/.test(nextLine)) {
+          // 한글 이름이나 짧은 줄이면 중단
+          break;
+        }
+      }
+      
+      if (addressLines.length > 0) {
+        addresses.push(addressLines.join(', '));
+      }
+    }
+    
+    // 한국 주소
+    for (const pattern of addressPatterns) {
+      const matches = line.match(pattern);
+      if (matches) {
+        matches.forEach(match => {
+          if (match.length > 10) {
+            addresses.push(match);
+          }
+        });
+      }
     }
   }
 
-// 6. 한국 이름 추출 (개선된 로직 - 모든 케이스 대응)
+  if (addresses.length > 0) {
+    // 가장 긴 주소 선택 (더 완전할 가능성)
+    data.address = addresses.sort((a, b) => b.length - a.length)[0];
+    console.log('주소 발견:', data.address);
+  }
+
+  // 6. 한국 이름 추출 (개선됨)
+  // 6. 이름 추출 (한글 + 영문 이름)
 const koreanSurnames = ['김', '이', '박', '최', '정', '강', '조', '윤', '장', '임', '한', '오', '서', '신', '권', '황', '안', '송', '류', '전', '홍', '고', '문', '손', '양', '배', '백', '허', '유', '남', '심', '노', '하', '곽', '성', '차', '주', '우', '구', '나', '민', '진', '지', '엄', '원', '채', '천', '방', '공', '현', '함', '변', '염', '여', '추', '도', '소'];
 
-const namesCandidates: { name: string; score: number; lineIndex: number }[] = [];
+// 영문 성씨 (한국 이름의 로마자 표기)
+const koreanSurnamesRoman = ['kim', 'lee', 'park', 'choi', 'jung', 'jeong', 'kang', 'cho', 'yoon', 'yun', 'jang', 'zhang', 'lim', 'im', 'han', 'oh', 'seo', 'shin', 'kwon', 'hwang', 'ahn', 'an', 'song', 'ryu', 'ryoo', 'jeon', 'jun', 'hong', 'ko', 'go', 'moon', 'mun', 'son', 'yang', 'bae', 'baek', 'heo', 'hur', 'yoo', 'yu', 'nam', 'sim', 'shim', 'noh', 'no', 'ha', 'kwak', 'sung', 'seong', 'cha', 'joo', 'ju', 'woo', 'wu', 'koo', 'gu', 'goo', 'na', 'min', 'jin', 'ji', 'chi', 'uhm', 'um', 'won', 'chae', 'chun', 'bang', 'kong', 'gong', 'hyun', 'hyeon', 'ham', 'byun', 'byeon', 'yum', 'yom', 'yeo', 'choo', 'chu', 'do', 'doh', 'so', 'soh'];
+
+const namesCandidates: { name: string; score: number; lineIndex: number; type: 'korean' | 'english' }[] = [];
 
 for (let i = 0; i < Math.min(10, lines.length); i++) {
   const line = lines[i];
@@ -375,22 +572,87 @@ for (let i = 0; i < Math.min(10, lines.length); i++) {
     
     if (cleaned === data.company || cleaned === data.position) score -= 30;
     
-    namesCandidates.push({ name: cleaned, score, lineIndex: i });
+    namesCandidates.push({ name: cleaned, score, lineIndex: i, type: 'korean' });
   }
   
-  // 방법 2: 직책 키워드와 함께
-  const hasPosition = positionKeywords.some(keyword => cleaned.includes(keyword));
+  // 방법 2: 영문 이름 (한국식 로마자 표기)
+  // 패턴: Kim Sunghoon, Lee Jinho, Park Minji 등
+  const englishNamePattern = /^([A-Z][a-z]+)\s+([A-Z][a-z]+)$/;
+  const englishMatch = cleaned.match(englishNamePattern);
+  
+  if (englishMatch) {
+    const firstName = englishMatch[1].toLowerCase();
+    const lastName = englishMatch[2].toLowerCase();
+    const fullName = cleaned;
+    
+    // 첫 단어가 한국 성씨인지 확인
+    if (koreanSurnamesRoman.includes(firstName)) {
+      let score = 15; // 영문 이름 기본 점수
+      
+      // 흔한 한국 성씨면 높은 점수
+      if (['kim', 'lee', 'park', 'choi', 'jung', 'jeong', 'kang', 'cho'].includes(firstName)) {
+        score += 15;
+      }
+      
+      // 이름 길이 체크 (한국 이름은 보통 짧음)
+      if (lastName.length >= 4 && lastName.length <= 10) {
+        score += 10;
+      }
+      
+      // 회사명/직책 키워드 포함하면 감점
+      if (companyKeywords.some(k => cleaned.toLowerCase().includes(k.toLowerCase()))) {
+        score -= 30;
+      }
+      if (positionKeywords.some(k => cleaned.toLowerCase().includes(k.toLowerCase()))) {
+        score -= 30;
+      }
+      
+      // 상위에 있을수록 높은 점수
+      score += (10 - i);
+      
+      namesCandidates.push({ name: fullName, score, lineIndex: i, type: 'english' });
+      console.log('영문 이름 발견:', fullName, '점수:', score);
+    }
+  }
+  
+  // 방법 3: 3단어 영문 이름 (Middle name 포함)
+  // 패턴: Kim Young Soo, Lee Min Ho 등
+  const threeWordNamePattern = /^([A-Z][a-z]+)\s+([A-Z][a-z]+)\s+([A-Z][a-z]+)$/;
+  const threeWordMatch = cleaned.match(threeWordNamePattern);
+  
+  if (threeWordMatch) {
+    const firstName = threeWordMatch[1].toLowerCase();
+    
+    if (koreanSurnamesRoman.includes(firstName)) {
+      let score = 18;
+      
+      if (['kim', 'lee', 'park', 'choi'].includes(firstName)) {
+        score += 15;
+      }
+      
+      score += (10 - i);
+      
+      namesCandidates.push({ name: cleaned, score, lineIndex: i, type: 'english' });
+      console.log('영문 이름 발견 (3단어):', cleaned, '점수:', score);
+    }
+  }
+  
+  // 방법 4: 직책 키워드와 같은 줄 또는 인접한 줄
+  const lowerLine = cleaned.toLowerCase();
+  const hasPosition = positionKeywords.some(keyword => lowerLine.includes(keyword));
+  
   if (hasPosition) {
     const parts = cleaned.split(/[\s||\-_]/);
     
     for (const part of parts) {
       const trimmed = part.trim();
       
+      // 한글 이름
       if (/^[가-힣]{2,4}$/.test(trimmed) && 
           koreanSurnames.some(s => trimmed.startsWith(s)) &&
           !positionKeywords.some(k => trimmed.includes(k))) {
         
-        let score = 15;
+        let score = 25;
         
         if (trimmed.length === 3) score += 10;
         if (koreanSurnames.slice(0, 10).some(s => trimmed.startsWith(s))) {
@@ -399,39 +661,48 @@ for (let i = 0; i < Math.min(10, lines.length); i++) {
         
         score += (10 - i);
         
-        namesCandidates.push({ name: trimmed, score, lineIndex: i });
+        namesCandidates.push({ name: trimmed, score, lineIndex: i, type: 'korean' });
         console.log('직책과 함께 발견된 이름:', trimmed, '점수:', score);
       }
     }
-  }
-  
-  // 방법 3: 회사명 키워드와 함께
-  const hasCompany = companyKeywords.some(keyword => cleaned.includes(keyword));
-  if (hasCompany) {
-    const parts = cleaned.split(/[\s||\-_()]/);
     
-    for (const part of parts) {
-      const trimmed = part.trim();
+    // 바로 위나 아래 줄에서 영문/한글 이름 찾기
+    if (i > 0) {
+      const prevLine = lines[i - 1].trim();
       
-      if (/^[가-힣]{2,4}$/.test(trimmed) && 
-          koreanSurnames.some(s => trimmed.startsWith(s)) &&
-          !companyKeywords.some(k => trimmed.includes(k))) {
-        
-        let score = 12;
-        
-        if (trimmed.length === 3) score += 10;
-        if (koreanSurnames.slice(0, 10).some(s => trimmed.startsWith(s))) {
-          score += 20;
-        }
-        
-        namesCandidates.push({ name: trimmed, score, lineIndex: i });
-        console.log('회사명과 함께 발견된 이름:', trimmed, '점수:', score);
+      // 한글 이름
+      if (/^[가-힣]{2,4}$/.test(prevLine) && koreanSurnames.some(s => prevLine.startsWith(s))) {
+        namesCandidates.push({ name: prevLine, score: 30, lineIndex: i - 1, type: 'korean' });
+        console.log('직책 바로 위 이름 (한글):', prevLine);
+      }
+      
+      // 영문 이름
+      const engMatch = prevLine.match(/^([A-Z][a-z]+)\s+([A-Z][a-z]+)$/);
+      if (engMatch && koreanSurnamesRoman.includes(engMatch[1].toLowerCase())) {
+        namesCandidates.push({ name: prevLine, score: 32, lineIndex: i - 1, type: 'english' });
+        console.log('직책 바로 위 이름 (영문):', prevLine);
+      }
+    }
+    
+    if (i < lines.length - 1) {
+      const nextLine = lines[i + 1].trim();
+      
+      // 한글 이름
+      if (/^[가-힣]{2,4}$/.test(nextLine) && koreanSurnames.some(s => nextLine.startsWith(s))) {
+        namesCandidates.push({ name: nextLine, score: 28, lineIndex: i + 1, type: 'korean' });
+        console.log('직책 바로 아래 이름 (한글):', nextLine);
+      }
+      
+      // 영문 이름
+      const engMatch = nextLine.match(/^([A-Z][a-z]+)\s+([A-Z][a-z]+)$/);
+      if (engMatch && koreanSurnamesRoman.includes(engMatch[1].toLowerCase())) {
+        namesCandidates.push({ name: nextLine, score: 30, lineIndex: i + 1, type: 'english' });
+        console.log('직책 바로 아래 이름 (영문):', nextLine);
       }
     }
   }
   
-  // 방법 4: 한글 + 영문 이름 혼합 (NEW!)
-  // "양희연 H.Hailey Yang" → "양희연"
+  // 방법 5: 한글 + 영문 혼합 (같은 줄)
   const koreanNamePattern = /([가-힣]{2,4})\s+[A-Z]/;
   const match = cleaned.match(koreanNamePattern);
   
@@ -439,7 +710,7 @@ for (let i = 0; i < Math.min(10, lines.length); i++) {
     const koreanName = match[1];
     
     if (koreanSurnames.some(s => koreanName.startsWith(s))) {
-      let score = 18; // 영문과 함께 = 신뢰도 매우 높음
+      let score = 18;
       
       if (koreanName.length === 3) score += 10;
       if (koreanSurnames.slice(0, 10).some(s => koreanName.startsWith(s))) {
@@ -448,29 +719,8 @@ for (let i = 0; i < Math.min(10, lines.length); i++) {
       
       score += (10 - i);
       
-      namesCandidates.push({ name: koreanName, score, lineIndex: i });
+      namesCandidates.push({ name: koreanName, score, lineIndex: i, type: 'korean' });
       console.log('영문과 함께 발견된 한글 이름:', koreanName, '점수:', score);
-    }
-  }
-  
-  // 방법 5: 공백 없이 붙은 경우 (NEW!)
-  // "양희연H.Hailey" 
-  const widePattern = /([가-힣]{2,4})[\s\t]*[A-Z.]/;
-  const wideMatch = cleaned.match(widePattern);
-  
-  if (wideMatch && !match) {
-    const koreanName = wideMatch[1];
-    
-    if (koreanSurnames.some(s => koreanName.startsWith(s))) {
-      let score = 16;
-      
-      if (koreanName.length === 3) score += 10;
-      if (koreanSurnames.slice(0, 10).some(s => koreanName.startsWith(s))) {
-        score += 20;
-      }
-      
-      namesCandidates.push({ name: koreanName, score, lineIndex: i });
-      console.log('영문과 붙어있는 한글 이름:', koreanName, '점수:', score);
     }
   }
 }
@@ -484,103 +734,44 @@ if (namesCandidates.length > 0) {
   
   if (bestCandidate.score > 0) {
     data.name = bestCandidate.name;
-    console.log('✅ 선택된 이름:', bestCandidate.name, '점수:', bestCandidate.score);
+    console.log('✅ 선택된 이름:', bestCandidate.name, '(타입:', bestCandidate.type, ') 점수:', bestCandidate.score);
   }
 }
 
-// 한글 이름을 못 찾았으면 영문 이름 찾기
-if (!data.name) {
-  for (const line of lines.slice(0, 10)) {
-    const cleaned = line.trim();
-    
-    if (/^[A-Z][a-z]+\s[A-Z][a-z]+$/.test(cleaned) && cleaned.length <= 20) {
-      data.name = cleaned;
-      console.log('영문 이름 발견:', cleaned);
-      break;
-    }
-  }
-}
-
-  // 7. 주소 추출 (여러 줄 합치기 - 개선)
-  const addressKeywords = ['시', '구', '동', '로', '길', '층', '호', '번지', 'Fl', 'Floor', 'St', 'Street', 'Ave'];
-  const addressLines: string[] = [];
-  let foundAddress = false;
+  // 7. 직책 추출 (개선됨 - 이름 근처 우선)
+  const positionCandidates: { position: string; score: number }[] = [];
   
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
+  for (let i = 0; i < Math.min(10, lines.length); i++) {
+    const line = lines[i];
+    const lowerLine = line.toLowerCase();
     
-    // 이미 주소를 찾았고, 현재 줄도 주소의 연속인지 확인
-    if (foundAddress) {
-      const hasAddressPattern = 
-        /\d+길/.test(line) || // "60길"
-        /\d+층/.test(line) || // "13층"
-        /\d+호/.test(line) || // "5호"
-        addressKeywords.some(keyword => line.includes(keyword)) ||
-        /^\d+\s*[A-Z]/.test(line) || // "3003 N First St" 같은 영문 주소
-        /^[A-Z]{2}\s*\d+/.test(line); // "CA 95134" 같은 주소
-      
-      if (hasAddressPattern && 
-          line.length < 50 &&
-          !line.includes('@') &&
-          !line.includes('www.') &&
-          !positionKeywords.some(keyword => line.includes(keyword))) {
-        addressLines.push(line);
-        continue;
-      } else {
-        break; // 주소가 끝남
-      }
-    }
-    
-    // 주소 시작 찾기
-    const koreanAddressPattern = /[가-힣]+[시도]|[가-힣]+[구군]|[가-힣]+[동읍면리]|[가-힣]+로|[가-힣]+길/;
-    const hasKoreanAddress = koreanAddressPattern.test(line);
-    const hasAddressKeyword = addressKeywords.some(keyword => line.includes(keyword));
-    
-    if ((hasKoreanAddress || hasAddressKeyword) && 
-        line.length > 5 &&
-        !line.includes('@') &&
-        !line.includes('www.') &&
-        !line.includes('http') &&
-        !positionKeywords.some(keyword => line.includes(keyword))) {
-      
-      addressLines.push(line);
-      foundAddress = true;
-    }
-  }
-  
-  if (addressLines.length > 0) {
-    data.address = addressLines.join(' ').trim();
-  }
-
-  // 8. 이름이 여전히 없다면 추가 시도
-  if (!data.name) {
-    // "이름 + 직책" 형태에서 분리
-    if (data.position) {
-      for (const line of lines.slice(0, 5)) {
-        const cleaned = line.trim();
-        // 직책 제거
-        const withoutPosition = positionKeywords.reduce((text, keyword) => 
-          text.replace(keyword, ''), cleaned).trim();
+    // 직책 키워드 포함
+    for (const keyword of positionKeywords) {
+      if (lowerLine.includes(keyword)) {
+        let score = 10;
         
-        if (withoutPosition.length >= 2 && 
-            withoutPosition.length <= 4 && 
-            /^[가-힣]+$/.test(withoutPosition)) {
-          data.name = withoutPosition;
-          break;
+        // 이름과 같은 줄이거나 인접하면 높은 점수
+        if (data.name && line.includes(data.name)) {
+          score += 20;
         }
+        
+        // 단독으로 직책만 있으면 높은 점수
+        if (line.trim() === keyword || /^[가-힣]+$/.test(line.trim())) {
+          score += 15;
+        }
+        
+        // 상위에 있을수록 높은 점수
+        score += (10 - i);
+        
+        positionCandidates.push({ position: line.trim(), score });
       }
     }
-    
-    // 그래도 없으면 첫 줄에서 한글 2-4자 찾기
-    if (!data.name) {
-      for (const line of lines.slice(0, 3)) {
-        const cleaned = line.trim();
-        if (/^[가-힣]{2,4}$/.test(cleaned)) {
-          data.name = cleaned;
-          break;
-        }
-      }
-    }
+  }
+  
+  if (positionCandidates.length > 0) {
+    positionCandidates.sort((a, b) => b.score - a.score);
+    data.position = positionCandidates[0].position;
+    console.log('✅ 선택된 직책:', data.position);
   }
 
   return data;

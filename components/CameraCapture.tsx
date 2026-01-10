@@ -159,21 +159,34 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
               </div>
             )}
             
-            {/* 명함 가이드 오버레이 */}
+            {/* 명함 가이드 오버레이 - Larger and Landscape */}
             {isReady && (
               <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                 <div 
-                  className="border-2 border-white rounded-lg shadow-lg"
+                  className="border-4 border-white rounded-2xl shadow-2xl relative"
                   style={{
-                    width: '85%',
-                    height: '55%',
-                    maxWidth: '400px',
-                    maxHeight: '250px',
+                    width: isMobile ? '90%' : '75%',
+                    maxWidth: '800px',
+                    aspectRatio: '16/9',
                   }}
                 >
-                  <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black/70 text-white px-3 py-1 rounded text-sm whitespace-nowrap">
-                    명함을 이 영역에 맞춰주세요
+                  {/* Corner markers */}
+                  <div className="absolute -top-2 -left-2 w-8 h-8 border-t-4 border-l-4 border-yellow-400 rounded-tl-lg"></div>
+                  <div className="absolute -top-2 -right-2 w-8 h-8 border-t-4 border-r-4 border-yellow-400 rounded-tr-lg"></div>
+                  <div className="absolute -bottom-2 -left-2 w-8 h-8 border-b-4 border-l-4 border-yellow-400 rounded-bl-lg"></div>
+                  <div className="absolute -bottom-2 -right-2 w-8 h-8 border-b-4 border-r-4 border-yellow-400 rounded-br-lg"></div>
+                  
+                  {/* Top instruction */}
+                  <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap backdrop-blur-sm">
+                    {isMobile ? '📱 명함을 가로로 맞춰주세요' : '💳 명함을 이 영역에 맞춰주세요'}
                   </div>
+                  
+                  {/* Bottom hint for mobile */}
+                  {isMobile && (
+                    <div className="absolute -bottom-12 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-4 py-2 rounded-lg text-xs whitespace-nowrap backdrop-blur-sm">
+                      💡 휴대폰을 가로로 돌리세요
+                    </div>
+                  )}
                 </div>
               </div>
             )}
