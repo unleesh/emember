@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { BusinessCardData } from '../app/page';
 
 interface DataEditorProps {
@@ -11,6 +11,41 @@ interface DataEditorProps {
 
 export default function DataEditor({ initialData, onSave, onBack }: DataEditorProps) {
   const [data, setData] = useState<BusinessCardData>(initialData);
+  const [isRecording, setIsRecording] = useState(false);
+  const [inputMode, setInputMode] = useState<'voice' | 'keyboard'>('voice');
+  const [recognition, setRecognition] = useState<any>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // 음성 인식 초기화
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      
+      if (SpeechRecognition) {
+        const recognitionInstance = new SpeechRecognition();
+        recognitionInstance.lang = 'ko-KR';
+        recognitionInstance.continuous = false;
+        recognitionInstance.interimResults = false;
+
+        recognitionInstance.onresult = (event: any) => {
+          const transcript = event.results[0][0].transcript;
+          handleChange('personalizedMessage', transcript);
+          setIsRecording(false);
+        };
+
+        recognitionInstance.onerror = (event: any) => {
+          console.error('Speech recognition error:', event.error);
+          setIsRecording(false);
+        };
+
+        recognitionInstance.onend = () => {
+          setIsRecording(false);
+        };
+
+        setRecognition(recognitionInstance);
+      }
+    }
+  }, []);
 
   const handleChange = (field: keyof BusinessCardData, value: string) => {
     setData(prev => ({
@@ -21,6 +56,30 @@ export default function DataEditor({ initialData, onSave, onBack }: DataEditorPr
 
   const handleSave = () => {
     onSave(data);
+  };
+
+  const startRecording = () => {
+    if (recognition) {
+      setIsRecording(true);
+      recognition.start();
+    } else {
+      alert('음성 인식을 지원하지 않는 브라우저입니다. 키보드 입력을 사용해주세요.');
+      setInputMode('keyboard');
+    }
+  };
+
+  const stopRecording = () => {
+    if (recognition && isRecording) {
+      recognition.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const toggleInputMode = () => {
+    if (isRecording) {
+      stopRecording();
+    }
+    setInputMode(prev => prev === 'voice' ? 'keyboard' : 'voice');
   };
 
   return (
@@ -137,6 +196,67 @@ export default function DataEditor({ initialData, onSave, onBack }: DataEditorPr
               className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
               placeholder="https://example.com"
             />
+          </div>
+
+          {/* 개인화된 메시지 - 새로 추가 */}
+          <div className="pt-4 border-t-2 border-gray-200">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                💬 개인화된 메시지
+              </label>
+              <button
+                type="button"
+                onClick={toggleInputMode}
+                className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+              >
+                {inputMode === 'voice' ? (
+                  <>
+                    ⌨️ <span>키보드 입력</span>
+                  </>
+                ) : (
+                  <>
+                    🎤 <span>음성 입력</span>
+                  </>
+                )}
+              </button>
+            </div>
+            
+            <p className="text-xs text-gray-500 mb-3">
+              {inputMode === 'voice' 
+                ? '🎤 음성으로 메시지를 입력하세요 (이메일에 포함될 내용)' 
+                : '⌨️ 키보드로 메시지를 입력하세요 (이메일에 포함될 내용)'}
+            </p>
+
+            {inputMode === 'voice' ? (
+              <div className="relative">
+                <textarea
+                  ref={textareaRef}
+                  value={data.personalizedMessage || ''}
+                  onChange={(e) => handleChange('personalizedMessage', e.target.value)}
+                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none min-h-[120px] resize-none"
+                  placeholder="예: 회의에서 좋은 대화 나눴습니다. 다음 주 미팅 기대하겠습니다."
+                  readOnly={isRecording}
+                />
+                <button
+                  type="button"
+                  onClick={isRecording ? stopRecording : startRecording}
+                  className={`absolute bottom-3 right-3 p-4 rounded-full font-bold transition-all shadow-lg ${
+                    isRecording 
+                      ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse' 
+                      : 'bg-blue-500 hover:bg-blue-600 text-white'
+                  }`}
+                >
+                  {isRecording ? '⏹️' : '🎤'}
+                </button>
+              </div>
+            ) : (
+              <textarea
+                value={data.personalizedMessage || ''}
+                onChange={(e) => handleChange('personalizedMessage', e.target.value)}
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none min-h-[120px] resize-y"
+                placeholder="예: 회의에서 좋은 대화 나눴습니다. 다음 주 미팅 기대하겠습니다."
+              />
+            )}
           </div>
 
           {/* 원본 텍스트 (선택사항) */}

@@ -142,12 +142,20 @@ export default function GoogleSheetsService({
                 </p>
               </div>
 
-              <div className="bg-gray-50 rounded-lg p-4 mb-6 space-y-2 text-sm">
+              <div className="bg-gray-50 rounded-lg p-4 mb-6 space-y-2 text-sm max-h-[400px] overflow-y-auto">
                 <div><strong>이름:</strong> {businessCardData.name || '-'}</div>
                 <div><strong>회사:</strong> {businessCardData.company || '-'}</div>
                 <div><strong>직책:</strong> {businessCardData.position || '-'}</div>
                 <div><strong>이메일:</strong> {businessCardData.email || '-'}</div>
                 <div><strong>전화:</strong> {businessCardData.phone || '-'}</div>
+                {businessCardData.personalizedMessage && (
+                  <div className="pt-2 border-t border-gray-300">
+                    <strong>💬 개인화된 메시지:</strong>
+                    <p className="mt-1 text-gray-700 bg-white p-2 rounded border border-gray-200">
+                      {businessCardData.personalizedMessage}
+                    </p>
+                  </div>
+                )}
               </div>
 
               <button

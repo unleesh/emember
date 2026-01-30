@@ -14,6 +14,7 @@ export interface BusinessCardData {
   phone: string;
   address: string;
   website: string;
+  personalizedMessage?: string;  // 새로 추가
   rawText?: string;
 }
 
