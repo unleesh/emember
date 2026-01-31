@@ -14,9 +14,7 @@ export default function DataEditor({ initialData, onSave, onBack }: DataEditorPr
   const [isRecording, setIsRecording] = useState(false);
   const [inputMode, setInputMode] = useState<'voice' | 'keyboard'>('voice');
   const [recognition, setRecognition] = useState<any>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // 음성 인식 초기화
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -84,7 +82,6 @@ export default function DataEditor({ initialData, onSave, onBack }: DataEditorPr
 
   return (
     <div className="fixed inset-0 bg-white flex flex-col">
-      {/* 헤더 - 고정 */}
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-4 flex items-center gap-3 flex-shrink-0 safe-area-top">
         <button
           onClick={onBack}
@@ -97,14 +94,10 @@ export default function DataEditor({ initialData, onSave, onBack }: DataEditorPr
         </h2>
       </div>
 
-      {/* 폼 - 가변 (스크롤 가능) */}
       <div className="flex-1 overflow-auto p-4 sm:p-6 min-h-0">
         <div className="max-w-2xl mx-auto space-y-4">
-          {/* 이름 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              👤 이름
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">👤 이름</label>
             <input
               type="text"
               value={data.name}
@@ -114,11 +107,8 @@ export default function DataEditor({ initialData, onSave, onBack }: DataEditorPr
             />
           </div>
 
-          {/* 회사명 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              🏢 회사명
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">🏢 회사명</label>
             <input
               type="text"
               value={data.company}
@@ -128,11 +118,8 @@ export default function DataEditor({ initialData, onSave, onBack }: DataEditorPr
             />
           </div>
 
-          {/* 직책 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              💼 직책
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">💼 직책</label>
             <input
               type="text"
               value={data.position}
@@ -142,11 +129,8 @@ export default function DataEditor({ initialData, onSave, onBack }: DataEditorPr
             />
           </div>
 
-          {/* 이메일 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              📧 이메일
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">📧 이메일</label>
             <input
               type="email"
               value={data.email}
@@ -156,11 +140,8 @@ export default function DataEditor({ initialData, onSave, onBack }: DataEditorPr
             />
           </div>
 
-          {/* 전화번호 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              📞 전화번호
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">📞 전화번호</label>
             <input
               type="tel"
               value={data.phone}
@@ -170,11 +151,8 @@ export default function DataEditor({ initialData, onSave, onBack }: DataEditorPr
             />
           </div>
 
-          {/* 주소 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              📍 주소
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">📍 주소</label>
             <input
               type="text"
               value={data.address}
@@ -184,11 +162,8 @@ export default function DataEditor({ initialData, onSave, onBack }: DataEditorPr
             />
           </div>
 
-          {/* 웹사이트 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              🌐 웹사이트
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">🌐 웹사이트</label>
             <input
               type="url"
               value={data.website}
@@ -198,43 +173,35 @@ export default function DataEditor({ initialData, onSave, onBack }: DataEditorPr
             />
           </div>
 
-          {/* 개인화된 메시지 - 새로 추가 */}
           <div className="pt-4 border-t-2 border-gray-200">
             <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-medium text-gray-700">
-                💬 개인화된 메시지
-              </label>
+              <label className="block text-sm font-medium text-gray-700">💬 개인화된 메시지</label>
               <button
                 type="button"
                 onClick={toggleInputMode}
                 className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
               >
                 {inputMode === 'voice' ? (
-                  <>
-                    ⌨️ <span>키보드 입력</span>
-                  </>
+                  <>⌨️ <span>키보드 입력</span></>
                 ) : (
-                  <>
-                    🎤 <span>음성 입력</span>
-                  </>
+                  <>🎤 <span>음성 입력</span></>
                 )}
               </button>
             </div>
             
             <p className="text-xs text-gray-500 mb-3">
               {inputMode === 'voice' 
-                ? '🎤 음성으로 메시지를 입력하세요 (이메일에 포함될 내용)' 
-                : '⌨️ 키보드로 메시지를 입력하세요 (이메일에 포함될 내용)'}
+                ? '🎤 음성으로 메시지를 입력하세요' 
+                : '⌨️ 키보드로 메시지를 입력하세요'}
             </p>
 
             {inputMode === 'voice' ? (
               <div className="relative">
                 <textarea
-                  ref={textareaRef}
                   value={data.personalizedMessage || ''}
                   onChange={(e) => handleChange('personalizedMessage', e.target.value)}
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none min-h-[120px] resize-none"
-                  placeholder="예: 회의에서 좋은 대화 나눴습니다. 다음 주 미팅 기대하겠습니다."
+                  placeholder="예: 회의에서 좋은 대화 나눴습니다."
                   readOnly={isRecording}
                 />
                 <button
@@ -254,12 +221,11 @@ export default function DataEditor({ initialData, onSave, onBack }: DataEditorPr
                 value={data.personalizedMessage || ''}
                 onChange={(e) => handleChange('personalizedMessage', e.target.value)}
                 className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none min-h-[120px] resize-y"
-                placeholder="예: 회의에서 좋은 대화 나눴습니다. 다음 주 미팅 기대하겠습니다."
+                placeholder="예: 회의에서 좋은 대화 나눴습니다."
               />
             )}
           </div>
 
-          {/* 원본 텍스트 (선택사항) */}
           {data.rawText && (
             <div>
               <button
@@ -283,12 +249,10 @@ export default function DataEditor({ initialData, onSave, onBack }: DataEditorPr
             </div>
           )}
 
-          {/* 하단 여백 (버튼 높이만큼) */}
           <div className="h-4"></div>
         </div>
       </div>
 
-      {/* 저장 버튼 - 고정 하단 */}
       <div className="bg-white p-4 sm:p-6 border-t border-gray-200 flex-shrink-0 safe-area-bottom shadow-lg">
         <button
           onClick={handleSave}

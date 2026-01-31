@@ -16,13 +16,11 @@ export default function GoogleSheetsService({
 }: GoogleSheetsServiceProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isDuplicate, setIsDuplicate] = useState(false);
   const [savedUrl, setSavedUrl] = useState<string | null>(null);
 
   const handleSave = async () => {
     setIsSaving(true);
     setError(null);
-    setIsDuplicate(false);
 
     try {
       const response = await fetch('/api/sheets', {
@@ -36,14 +34,7 @@ export default function GoogleSheetsService({
       const result = await response.json();
 
       if (!response.ok) {
-        // 중복 에러인 경우 (409 상태 코드)
-        if (response.status === 409 || result.duplicate) {
-          setIsDuplicate(true);
-          setError(result.message || result.error || '중복된 전화번호입니다');
-        } else {
-          setError(result.error || '저장 실패');
-        }
-        return;
+        throw new Error(result.error || '저장 실패');
       }
 
       setSavedUrl(result.url);
@@ -104,31 +95,16 @@ export default function GoogleSheetsService({
           {error ? (
             <>
               <div className="text-center mb-6">
-                <span className="text-6xl block mb-4">
-                  {isDuplicate ? '🔄' : '⚠️'}
-                </span>
-                <h3 className="text-xl font-bold text-red-600 mb-2">
-                  {isDuplicate ? '중복된 전화번호' : '저장 실패'}
-                </h3>
-                <p className="text-gray-600 whitespace-pre-line">{error}</p>
+                <span className="text-6xl block mb-4">⚠️</span>
+                <h3 className="text-xl font-bold text-red-600 mb-2">저장 실패</h3>
+                <p className="text-gray-600">{error}</p>
               </div>
-              <div className="space-y-3">
-                {isDuplicate ? (
-                  <button
-                    onClick={onBack}
-                    className="w-full bg-orange-600 text-white py-4 rounded-xl font-bold hover:bg-orange-700"
-                  >
-                    ← 수정하기
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleSave}
-                    className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700"
-                  >
-                    다시 시도
-                  </button>
-                )}
-              </div>
+              <button
+                onClick={handleSave}
+                className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700"
+              >
+                다시 시도
+              </button>
             </>
           ) : (
             <>
@@ -150,7 +126,7 @@ export default function GoogleSheetsService({
                 <div><strong>전화:</strong> {businessCardData.phone || '-'}</div>
                 {businessCardData.personalizedMessage && (
                   <div className="pt-2 border-t border-gray-300">
-                    <strong>💬 개인화된 메시지:</strong>
+                    <strong>💬 메시지:</strong>
                     <p className="mt-1 text-gray-700 bg-white p-2 rounded border border-gray-200">
                       {businessCardData.personalizedMessage}
                     </p>

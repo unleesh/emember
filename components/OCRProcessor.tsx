@@ -336,7 +336,7 @@ phonePatterns.forEach(pattern => {
   }
 });
 
-const uniquePhones = Array.from(new Set(phoneNumbers));
+const uniquePhones = [...new Set(phoneNumbers)];
 const sortedPhones = uniquePhones.sort((a, b) => {
   const aHasPlus = a.startsWith('+');
   const bHasPlus = b.startsWith('+');

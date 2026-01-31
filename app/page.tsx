@@ -14,7 +14,7 @@ export interface BusinessCardData {
   phone: string;
   address: string;
   website: string;
-  personalizedMessage?: string;  // 새로 추가
+  personalizedMessage?: string;
   rawText?: string;
 }
 
@@ -47,7 +47,6 @@ export default function Home() {
   };
 
   const handleSaveComplete = () => {
-    // 저장 완료 후 처음으로
     setStep('home');
     setCapturedImage(null);
     setOcrData(null);
@@ -71,15 +70,13 @@ export default function Home() {
     <main className="h-screen w-screen overflow-hidden">
       {step === 'home' && (
         <div className="h-full flex flex-col bg-gradient-to-br from-blue-600 via-purple-600 to-pink-500">
-          {/* 헤더 */}
           <div className="p-6 text-white">
             <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
-              📇 명함 스캐너
+              📇 emember
             </h1>
-            <p className="text-blue-100">명함을 스캔하고 자동으로 정리해보세요</p>
+            <p className="text-blue-100">명함 스캔부터 이메일 발송까지 자동화</p>
           </div>
 
-          {/* 메인 컨텐츠 */}
           <div className="flex-1 flex flex-col items-center justify-center p-6">
             <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full">
               <div className="text-center mb-8">
@@ -95,23 +92,38 @@ export default function Home() {
 
               <button
                 onClick={handleStartScan}
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95"
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95 mb-3"
               >
                 📷 스캔 시작하기
               </button>
 
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <button
+                  onClick={() => window.location.href = '/setup'}
+                  className="bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200 transition-all text-sm"
+                >
+                  ⚙️ 기본 설정
+                </button>
+                <button
+                  onClick={() => window.location.href = '/email-setup'}
+                  className="bg-purple-100 text-purple-700 py-3 rounded-xl font-medium hover:bg-purple-200 transition-all text-sm"
+                >
+                  📧 이메일 설정
+                </button>
+              </div>
+
               <div className="mt-6 space-y-3 text-sm text-gray-600">
                 <div className="flex items-center gap-2">
                   <span className="text-green-500">✓</span>
-                  <span>Google Cloud Vision API로 정확한 인식</span>
+                  <span>Google Cloud Vision으로 정확한 인식</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-green-500">✓</span>
-                  <span>자동으로 Google Sheets에 저장</span>
+                  <span>Google Sheets 자동 저장</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-green-500">✓</span>
-                  <span>한글/영문 명함 모두 지원</span>
+                  <span className="text-purple-500">✓</span>
+                  <span>AI로 이메일 자동 작성 (선택)</span>
                 </div>
               </div>
             </div>
