@@ -21,9 +21,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <head>
+      <body className="antialiased">
         <Script 
           src="https://cdn.portone.io/v2/browser-sdk.js"
+          strategy="beforeInteractive"
         />
         <Script 
           src="https://accounts.google.com/gsi/client" 
@@ -33,8 +34,6 @@ export default function RootLayout({
           src="https://apis.google.com/js/api.js" 
           strategy="beforeInteractive"
         />
-      </head>
-      <body className="antialiased">
         {children}
       </body>
     </html>
