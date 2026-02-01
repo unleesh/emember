@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { BusinessCardData } from '../app/page';
+import SubscriptionDialog from './SubscriptionDialog';
 
 interface GoogleSheetsServiceProps {
   businessCardData: BusinessCardData;
@@ -17,34 +18,69 @@ export default function GoogleSheetsService({
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedUrl, setSavedUrl] = useState<string | null>(null);
+  const [showSubscriptionDialog, setShowSubscriptionDialog] = useState(false);
+  const [cardCount, setCardCount] = useState(0);
 
   const handleSave = async () => {
-    setIsSaving(true);
-    setError(null);
+  setIsSaving(true);
+  setError(null);
 
-    try {
-      const response = await fetch('/api/sheets', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(businessCardData),
-      });
+  try {
+    // ✅ 1. 구독 상태 확인 (신규 추가)
+    const checkResponse = await fetch('/api/subscription/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        userConfig: null // 환경 변수 사용
+      }),
+    });
 
-      const result = await response.json();
+    const checkResult = await checkResponse.json();
 
-      if (!response.ok) {
-        throw new Error(result.error || '저장 실패');
+    // ✅ 2. 5명 초과 시 구독 체크 (신규 추가)
+    if (checkResult.needsSubscription) {
+      const subscriptionStr = localStorage.getItem('emember_subscription');
+      const subscription = subscriptionStr ? JSON.parse(subscriptionStr) : null;
+
+      if (!subscription || !subscription.subscribed) {
+        // 구독 필요 → 결제 다이얼로그 표시
+        setCardCount(checkResult.cardCount);
+        setShowSubscriptionDialog(true);
+        setIsSaving(false);
+        return; // 여기서 중단!
       }
-
-      setSavedUrl(result.url);
-    } catch (err: any) {
-      console.error('저장 오류:', err);
-      setError(err.message || '알 수 없는 오류가 발생했습니다.');
-    } finally {
-      setIsSaving(false);
     }
-  };
+    // (여기까지 신규 추가)
+
+    // ✅ 3. 기존 저장 로직 (그대로 유지)
+    const response = await fetch('/api/sheets', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(businessCardData),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || '저장 실패');
+    }
+
+    setSavedUrl(result.url);
+  } catch (err: any) {
+    console.error('저장 오류:', err);
+    setError(err.message || '알 수 없는 오류가 발생했습니다.');
+  } finally {
+    setIsSaving(false);
+  }
+};
+
+const handleSubscriptionSuccess = () => {
+  setShowSubscriptionDialog(false);
+  // 구독 완료 후 자동으로 저장 재시도
+  handleSave();
+};
 
   if (savedUrl) {
     return (
@@ -152,6 +188,16 @@ export default function GoogleSheetsService({
           )}
         </div>
       </div>
+      {showSubscriptionDialog && (
+      <SubscriptionDialog
+        cardCount={cardCount}
+        onClose={() => {
+          setShowSubscriptionDialog(false);
+          setIsSaving(false);
+        }}
+        onSuccess={handleSubscriptionSuccess}
+      />
+    )}
     </div>
   );
 }
