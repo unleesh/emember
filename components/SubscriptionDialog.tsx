@@ -17,12 +17,17 @@ export default function SubscriptionDialog({ cardCount, onClose, onSuccess }: Su
     setError(null);
 
     try {
-      // ✅ 1. PortOne SDK 확인
-      if (typeof window === 'undefined') {
-        throw new Error('브라우저 환경이 아닙니다.');
+    // ✅ 1. PortOne SDK 로드 대기 (최대 5초)
+    let PortOne = (window as any).PortOne;
+    
+    if (!PortOne) {
+      // SDK가 아직 없으면 잠시 대기
+      for (let i = 0; i < 10; i++) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        PortOne = (window as any).PortOne;
+        if (PortOne) break;
       }
-
-      const PortOne = (window as any).PortOne;
+    }
       
       if (!PortOne) {
         throw new Error('결제 모듈을 불러올 수 없습니다. 페이지를 새로고침해주세요.');
