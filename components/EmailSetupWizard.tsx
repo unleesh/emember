@@ -118,9 +118,9 @@ ${setupData.aiProvider === 'groq' ? 'GROQ_API_KEY' : 'GEMINI_API_KEY'}=${setupDa
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
-      <div className="max-w-4xl mx-auto py-8 px-4">
-        <div className="text-center mb-8">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 overflow-hidden">
+      <div className="max-w-4xl mx-auto w-full h-full flex flex-col py-8 px-4">
+        <div className="text-center mb-4 flex-shrink-0">
           <h1 className="text-4xl font-bold text-gray-800 mb-2">
             📧 이메일 자동화 설정
           </h1>
@@ -129,7 +129,7 @@ ${setupData.aiProvider === 'groq' ? 'GROQ_API_KEY' : 'GEMINI_API_KEY'}=${setupDa
           </p>
         </div>
 
-        <div className="mb-8">
+        <div className="mb-4 flex-shrink-0">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-700">진행률</span>
             <span className="text-sm font-medium text-purple-600">
@@ -156,7 +156,8 @@ ${setupData.aiProvider === 'groq' ? 'GROQ_API_KEY' : 'GEMINI_API_KEY'}=${setupDa
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+        <div className="flex-1 overflow-y-auto mb-4">
+          <div className="bg-white rounded-2xl shadow-xl p-8">
           {/* Welcome */}
           {step === 'welcome' && (
             <div className="text-center">
@@ -580,6 +581,7 @@ ${setupData.aiProvider === 'groq' ? 'GROQ_API_KEY' : 'GEMINI_API_KEY'}=${setupDa
               </div>
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>

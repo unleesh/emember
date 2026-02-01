@@ -86,10 +86,10 @@ GOOGLE_SPREADSHEET_ID=${setupData.spreadsheetId || 'your-spreadsheet-id'}`;
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-      <div className="max-w-4xl mx-auto py-8 px-4">
-        {/* 헤더 */}
-        <div className="text-center mb-8">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 overflow-hidden">
+      <div className="max-w-4xl mx-auto w-full h-full flex flex-col py-8 px-4">
+        {/* 헤더 - 고정 */}
+        <div className="text-center mb-4 flex-shrink-0">
           <h1 className="text-4xl font-bold text-gray-800 mb-2">
             📇 emember 설정하기
           </h1>
@@ -98,8 +98,8 @@ GOOGLE_SPREADSHEET_ID=${setupData.spreadsheetId || 'your-spreadsheet-id'}`;
           </p>
         </div>
 
-        {/* 진행 상황 */}
-        <div className="mb-8">
+        {/* 진행 상황 - 고정 */}
+        <div className="mb-4 flex-shrink-0">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-700">진행률</span>
             <span className="text-sm font-medium text-blue-600">
@@ -124,8 +124,9 @@ GOOGLE_SPREADSHEET_ID=${setupData.spreadsheetId || 'your-spreadsheet-id'}`;
           </div>
         </div>
 
-        {/* 메인 컨텐츠 */}
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+        {/* 메인 컨텐츠 - 스크롤 가능 */}
+        <div className="flex-1 overflow-y-auto mb-4">
+          <div className="bg-white rounded-2xl shadow-xl p-8">
           {/* Welcome */}
           {step === 'welcome' && (
             <div className="text-center">
@@ -461,6 +462,7 @@ GOOGLE_SPREADSHEET_ID=${setupData.spreadsheetId || 'your-spreadsheet-id'}`;
               </button>
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>
