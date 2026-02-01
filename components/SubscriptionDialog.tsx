@@ -17,14 +17,20 @@ export default function SubscriptionDialog({ cardCount, onClose, onSuccess }: Su
     setError(null);
 
     try {
-      // PortOne SDK 로드 확인
-      if (typeof window === 'undefined' || !(window as any).PortOne) {
-        throw new Error('결제 모듈을 불러올 수 없습니다. 페이지를 새로고침해주세요.');
+      // ✅ 1. PortOne SDK 확인
+      if (typeof window === 'undefined') {
+        throw new Error('브라우저 환경이 아닙니다.');
       }
 
       const PortOne = (window as any).PortOne;
+      
+      if (!PortOne) {
+        throw new Error('결제 모듈을 불러올 수 없습니다. 페이지를 새로고침해주세요.');
+      }
 
-      // 1. 결제 정보 생성
+      console.log('✅ PortOne SDK 로드 완료');
+
+      // ✅ 2. 결제 정보 생성 (서버에서 환경 변수 가져오기)
       const response = await fetch('/api/subscription/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -38,18 +44,23 @@ export default function SubscriptionDialog({ cardCount, onClose, onSuccess }: Su
         throw new Error('결제 정보 생성에 실패했습니다.');
       }
 
-      const { orderId, storeId, productName, amount } = await response.json();
+      const paymentData = await response.json();
+      
+      console.log('결제 정보:', paymentData);
 
-      console.log('결제 시작:', { orderId, storeId, productName, amount });
+      // ✅ 3. 필수 값 확인
+      if (!paymentData.storeId || !paymentData.channelKey) {
+        throw new Error('결제 설정이 완료되지 않았습니다. 관리자에게 문의하세요.');
+      }
 
-      // 2. PortOne 결제창 호출
+      // ✅ 4. PortOne 결제창 호출
       const paymentResponse = await PortOne.requestPayment({
-        storeId: storeId,
-        paymentId: orderId,
-        orderName: productName,
-        totalAmount: amount,
+        storeId: paymentData.storeId,
+        paymentId: paymentData.orderId,
+        orderName: paymentData.productName,
+        totalAmount: paymentData.amount,
         currency: 'CURRENCY_KRW',
-        channelKey: process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY, // 토스페이먼츠 채널 키
+        channelKey: paymentData.channelKey,
         payMethod: 'CARD',
         customer: {
           fullName: '사용자',
@@ -59,24 +70,24 @@ export default function SubscriptionDialog({ cardCount, onClose, onSuccess }: Su
 
       console.log('결제 응답:', paymentResponse);
 
-      // 결제 실패 체크
+      // ✅ 5. 결제 실패 체크
       if (paymentResponse?.code != null) {
         throw new Error(paymentResponse.message || '결제에 실패했습니다.');
       }
 
-      // 3. 결제 성공 - localStorage에 저장 (간단 버전)
+      // ✅ 6. 성공 처리
       localStorage.setItem('emember_subscription', JSON.stringify({
         subscribed: true,
         subscribedAt: new Date().toISOString(),
-        orderId: orderId,
-        amount: amount,
+        orderId: paymentData.orderId,
+        amount: paymentData.amount,
       }));
 
       alert('✅ 프리미엄 구독이 완료되었습니다!\n이제 무제한으로 명함을 저장할 수 있습니다.');
       onSuccess();
 
     } catch (err: any) {
-      console.error('결제 오류:', err);
+      console.error('❌ 결제 오류:', err);
       setError(err.message || '결제 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
