@@ -1,10 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
-  webpack: (config) => {
-    config.resolve.alias.canvas = false;
-    return config;
-  },
   async headers() {
     return [
       {
@@ -14,20 +9,18 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://apis.google.com https://accounts.google.com https://cdn.jsdelivr.net",
-              "style-src 'self' 'unsafe-inline' https://accounts.google.com",
-              "img-src 'self' data: https: blob:",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.portone.io https://cdn.jsdelivr.net https://accounts.google.com https://apis.google.com",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: https:",
               "font-src 'self' data:",
-              "connect-src 'self' https://vision.googleapis.com https://sheets.googleapis.com https://accounts.google.com https://www.googleapis.com https://cdn.jsdelivr.net https://oauth2.googleapis.com https://content-sheets.googleapis.com https://content.googleapis.com",
-              "frame-src https://accounts.google.com https://content-sheets.googleapis.com https://content.googleapis.com",
-              "worker-src 'self' blob:",
-              "child-src 'self' blob:",
+              "connect-src 'self' https://cdn.portone.io https://api.portone.io https://accounts.google.com https://apis.google.com https://vision.googleapis.com https://generativelanguage.googleapis.com https://api.groq.com",
+              "frame-src 'self' https://accounts.google.com",
             ].join('; '),
           },
         ],
       },
     ];
   },
-}
+};
 
-module.exports = nextConfig
+module.exports = nextConfig;
