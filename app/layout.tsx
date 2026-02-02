@@ -1,17 +1,15 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
-import Script from 'next/script';
+
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: '명함 스캐너',
-  description: 'AI 명함 스캐너 - OCR로 명함을 스캔하고 Google Sheets에 저장',
-  manifest: '/manifest.json',
-  themeColor: '#2563eb',
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'black-translucent',
-    title: '명함 스캐너'
-  }
+  title: "emember - 명함 스캐너",
+  description: "AI로 자동으로 정보를 추출하고 Google Sheets에 저장합니다",
+  icons: {
+    icon: '/icon.png',
+  },
 };
 
 export default function RootLayout({
@@ -21,19 +19,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body className="antialiased">
-        <Script 
-          src="https://cdn.portone.io/v2/browser-sdk.js"
-          strategy="beforeInteractive"
-        />
-        <Script 
-          src="https://accounts.google.com/gsi/client" 
-          strategy="beforeInteractive"
-        />
-        <Script 
-          src="https://apis.google.com/js/api.js" 
-          strategy="beforeInteractive"
-        />
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#4F46E5" />
+        <script src="/portone.js" defer />
+      </head>
+      <body className={inter.className}>
         {children}
       </body>
     </html>
