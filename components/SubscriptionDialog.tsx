@@ -17,48 +17,31 @@ export default function SubscriptionDialog({ cardCount, onClose, onSuccess }: Su
     setError(null);
 
     try {
-    // ✅ 1. PortOne SDK 로드 대기 (최대 5초)
-    let PortOne = (window as any).PortOne;
-    
-    if (!PortOne) {
-      // SDK가 아직 없으면 잠시 대기
-      for (let i = 0; i < 10; i++) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        PortOne = (window as any).PortOne;
-        if (PortOne) break;
-      }
-    }
+      const PortOne = (window as any).PortOne;
+      if (!PortOne) throw new Error('결제 모듈 없음');
+
+      // ✅ spreadsheetId 가져오기
+      const configStr = localStorage.getItem('emember_config');
+      const userConfig = configStr ? JSON.parse(configStr) : null;
+      const spreadsheetId = userConfig?.spreadsheetId || process.env.NEXT_PUBLIC_GOOGLE_SPREADSHEET_ID;
       
-      if (!PortOne) {
-        throw new Error('결제 모듈을 불러올 수 없습니다. 페이지를 새로고침해주세요.');
-      }
+      if (!spreadsheetId) throw new Error('스프레드시트 설정 필요');
 
-      console.log('✅ PortOne SDK 로드 완료');
-
-      // ✅ 2. 결제 정보 생성 (서버에서 환경 변수 가져오기)
+      // 결제 정보 생성
       const response = await fetch('/api/subscription/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customerName: '사용자',
           customerEmail: 'user@emember.app',
+          spreadsheetId, // ✅
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('결제 정보 생성에 실패했습니다.');
-      }
-
+      if (!response.ok) throw new Error('결제 정보 생성 실패');
       const paymentData = await response.json();
-      
-      console.log('결제 정보:', paymentData);
 
-      // ✅ 3. 필수 값 확인
-      if (!paymentData.storeId || !paymentData.channelKey) {
-        throw new Error('결제 설정이 완료되지 않았습니다. 관리자에게 문의하세요.');
-      }
-
-      // ✅ 4. PortOne 결제창 호출
+      // PortOne 결제창
       const paymentResponse = await PortOne.requestPayment({
         storeId: paymentData.storeId,
         paymentId: paymentData.orderId,
@@ -71,29 +54,22 @@ export default function SubscriptionDialog({ cardCount, onClose, onSuccess }: Su
           fullName: '사용자',
           email: 'user@emember.app',
         },
+        customData: { // ✅ Webhook으로 전달
+          spreadsheetId: spreadsheetId,
+          customerEmail: 'user@emember.app',
+        },
       });
 
-      console.log('결제 응답:', paymentResponse);
-
-      // ✅ 5. 결제 실패 체크
       if (paymentResponse?.code != null) {
-        throw new Error(paymentResponse.message || '결제에 실패했습니다.');
+        throw new Error(paymentResponse.message || '결제 실패');
       }
 
-      // ✅ 6. 성공 처리
-      localStorage.setItem('emember_subscription', JSON.stringify({
-        subscribed: true,
-        subscribedAt: new Date().toISOString(),
-        orderId: paymentData.orderId,
-        amount: paymentData.amount,
-      }));
-
-      alert('✅ 프리미엄 구독이 완료되었습니다!\n이제 무제한으로 명함을 저장할 수 있습니다.');
+      alert('✅ 프리미엄 구독 완료!\n이제 무제한 저장 가능합니다.');
       onSuccess();
 
     } catch (err: any) {
-      console.error('❌ 결제 오류:', err);
-      setError(err.message || '결제 중 오류가 발생했습니다.');
+      console.error('결제 오류:', err);
+      setError(err.message || '결제 중 오류 발생');
     } finally {
       setLoading(false);
     }
@@ -107,12 +83,10 @@ export default function SubscriptionDialog({ cardCount, onClose, onSuccess }: Su
         </h2>
 
         <div className="bg-yellow-50 border-2 border-yellow-200 p-4 rounded-xl mb-6">
-          <p className="text-yellow-800 font-medium mb-2">
-            ⚠️ 무료 한도 초과
-          </p>
+          <p className="text-yellow-800 font-medium mb-2">⚠️ 무료 한도 초과</p>
           <p className="text-sm text-yellow-700">
-            현재 <strong>{cardCount}명</strong>의 명함이 저장되어 있습니다.<br/>
-            무료는 5명까지만 가능하며, 더 저장하려면 프리미엄 구독이 필요합니다.
+            현재 <strong>{cardCount}명</strong> 저장됨<br/>
+            무료는 5명까지, 더 저장하려면 프리미엄 필요
           </p>
         </div>
 
@@ -154,14 +128,14 @@ export default function SubscriptionDialog({ cardCount, onClose, onSuccess }: Su
           <button
             onClick={onClose}
             disabled={loading}
-            className="flex-1 bg-gray-200 text-gray-700 px-6 py-3 rounded-xl font-medium hover:bg-gray-300 disabled:opacity-50 transition-all"
+            className="flex-1 bg-gray-200 text-gray-700 px-6 py-3 rounded-xl font-medium hover:bg-gray-300 disabled:opacity-50"
           >
             나중에
           </button>
           <button
             onClick={handleSubscribe}
             disabled={loading}
-            className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-xl font-bold hover:shadow-lg disabled:opacity-50 transition-all"
+            className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-xl font-bold hover:shadow-lg disabled:opacity-50"
           >
             {loading ? '처리 중...' : '지금 구독하기'}
           </button>

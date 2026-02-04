@@ -26,39 +26,43 @@ export default function GoogleSheetsService({
   setError(null);
 
   try {
-    // ✅ 1. 구독 상태 확인 (신규 추가)
+    const configStr = localStorage.getItem('emember_config');
+    let userConfig = null;
+    
+    if (configStr) {
+      userConfig = JSON.parse(configStr);
+    }
+
+    // ✅ Redis에서 구독 상태 확인
     const checkResponse = await fetch('/api/subscription/check', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        userConfig: null // 환경 변수 사용
-      }),
+      body: JSON.stringify({ userConfig }),
     });
 
     const checkResult = await checkResponse.json();
+    console.log('구독 상태:', checkResult);
 
-    // ✅ 2. 5명 초과 시 구독 체크 (신규 추가)
-    if (checkResult.needsSubscription) {
-      const subscriptionStr = localStorage.getItem('emember_subscription');
-      const subscription = subscriptionStr ? JSON.parse(subscriptionStr) : null;
-
-      if (!subscription || !subscription.subscribed) {
-        // 구독 필요 → 결제 다이얼로그 표시
-        setCardCount(checkResult.cardCount);
-        setShowSubscriptionDialog(true);
-        setIsSaving(false);
-        return; // 여기서 중단!
-      }
+    // ✅ Redis 기반 구독 확인 (localStorage 사용 안 함!)
+    if (checkResult.needsSubscription && !checkResult.hasSubscription) {
+      setCardCount(checkResult.cardCount);
+      setShowSubscriptionDialog(true);
+      setIsSaving(false);
+      return;
     }
-    // (여기까지 신규 추가)
 
-    // ✅ 3. 기존 저장 로직 (그대로 유지)
+    // 저장 진행
     const response = await fetch('/api/sheets', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(businessCardData),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...businessCardData,
+        userConfig: userConfig ? {
+          spreadsheetId: userConfig.spreadsheetId,
+          serviceAccountEmail: userConfig.serviceAccountEmail,
+          privateKey: userConfig.privateKey,
+        } : null
+      }),
     });
 
     const result = await response.json();
@@ -68,13 +72,15 @@ export default function GoogleSheetsService({
     }
 
     setSavedUrl(result.url);
+
   } catch (err: any) {
     console.error('저장 오류:', err);
-    setError(err.message || '알 수 없는 오류가 발생했습니다.');
+    setError(err.message || '알 수 없는 오류');
   } finally {
     setIsSaving(false);
   }
 };
+
 
 const handleSubscriptionSuccess = () => {
   setShowSubscriptionDialog(false);
