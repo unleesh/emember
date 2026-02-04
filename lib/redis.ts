@@ -1,13 +1,41 @@
 import { Redis } from '@upstash/redis';
 
-// Upstash Redis 클라이언트
-// Vercel Integration으로 자동 설정된 환경 변수 사용
-export const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL!,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+// Vercel Integration 환경 변수 이름 자동 감지
+const getRedisUrl = () => {
+  return process.env.UPSTASH_REDIS_REST_URL || 
+         process.env.KV_REST_API_URL || 
+         process.env.REDIS_URL ||
+         '';
+};
+
+const getRedisToken = () => {
+  return process.env.UPSTASH_REDIS_REST_TOKEN || 
+         process.env.KV_REST_API_TOKEN || 
+         process.env.REDIS_TOKEN ||
+         '';
+};
+
+const url = getRedisUrl();
+const token = getRedisToken();
+
+console.log('Redis Config:', {
+  url: url ? '✅ ' + url.substring(0, 30) + '...' : '❌ Missing',
+  token: token ? '✅ ' + token.substring(0, 20) + '...' : '❌ Missing',
 });
 
-// 구독 정보 타입
+if (!url || !token) {
+  console.error('❌ Redis credentials missing!');
+  console.error('Available env vars:', Object.keys(process.env).filter(k => 
+    k.includes('UPSTASH') || k.includes('REDIS') || k.includes('KV')
+  ));
+}
+
+// Redis 클라이언트
+export const redis = new Redis({
+  url: url,
+  token: token,
+});
+
 export interface Subscription {
   spreadsheetId: string;
   subscribed: boolean;
@@ -18,13 +46,11 @@ export interface Subscription {
   customerEmail?: string;
 }
 
-/**
- * 구독 정보 조회
- */
 export async function getSubscription(spreadsheetId: string): Promise<Subscription | null> {
   try {
     const key = `subscription:${spreadsheetId}`;
     const data = await redis.get<Subscription>(key);
+    console.log('Redis GET:', key, data ? '✅' : '❌');
     return data;
   } catch (error) {
     console.error('Redis get error:', error);
@@ -32,78 +58,34 @@ export async function getSubscription(spreadsheetId: string): Promise<Subscripti
   }
 }
 
-/**
- * 구독 정보 저장
- */
 export async function setSubscription(spreadsheetId: string, data: Subscription): Promise<void> {
   try {
     const key = `subscription:${spreadsheetId}`;
-    // 30일 TTL (자동 만료)
     await redis.set(key, data, { ex: 30 * 24 * 60 * 60 });
-    console.log('✅ Subscription saved:', key);
+    console.log('✅ Redis SET:', key);
+    
+    // 확인
+    const saved = await redis.get(key);
+    console.log('Verification:', saved ? '✅ Saved' : '❌ Not saved');
   } catch (error) {
     console.error('Redis set error:', error);
     throw error;
   }
 }
 
-/**
- * 구독 정보 삭제
- */
-export async function deleteSubscription(spreadsheetId: string): Promise<void> {
-  try {
-    const key = `subscription:${spreadsheetId}`;
-    await redis.del(key);
-    console.log('✅ Subscription deleted:', key);
-  } catch (error) {
-    console.error('Redis del error:', error);
-    throw error;
-  }
-}
-
-/**
- * 구독 상태 확인 (활성화 + 만료일 체크)
- */
 export async function isSubscribed(spreadsheetId: string): Promise<boolean> {
   try {
     const subscription = await getSubscription(spreadsheetId);
+    if (!subscription?.subscribed) return false;
     
-    if (!subscription) {
-      return false;
-    }
-    
-    if (!subscription.subscribed) {
-      return false;
-    }
-    
-    // 만료일 체크
     const expiresAt = new Date(subscription.expiresAt);
-    const now = new Date();
+    const isValid = expiresAt > new Date();
     
-    if (expiresAt <= now) {
-      console.log('⚠️ Subscription expired:', spreadsheetId);
-      return false;
-    }
+    console.log('isSubscribed:', spreadsheetId.substring(0, 10) + '...', isValid);
     
-    return true;
+    return isValid;
   } catch (error) {
     console.error('isSubscribed error:', error);
     return false;
   }
-}
-
-/**
- * 디버깅용: 구독 정보 상세 조회
- */
-export async function debugSubscription(spreadsheetId: string) {
-  const key = `subscription:${spreadsheetId}`;
-  const data = await redis.get(key);
-  const ttl = await redis.ttl(key);
-  
-  console.log('=== Subscription Debug ===');
-  console.log('Key:', key);
-  console.log('Data:', data);
-  console.log('TTL:', ttl, 'seconds (', Math.floor(ttl / 86400), 'days )');
-  
-  return { key, data, ttl };
 }
