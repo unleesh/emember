@@ -18,14 +18,47 @@ export default function SubscriptionDialog({ cardCount, onClose, onSuccess }: Su
 
     try {
       const PortOne = (window as any).PortOne;
-      if (!PortOne) throw new Error('결제 모듈 없음');
+      if (!PortOne) {
+        throw new Error('결제 모듈을 불러올 수 없습니다.');
+      }
 
-      // ✅ spreadsheetId 가져오기
+      // ✅ localStorage에서 먼저 확인
       const configStr = localStorage.getItem('emember_config');
-      const userConfig = configStr ? JSON.parse(configStr) : null;
-      const spreadsheetId = userConfig?.spreadsheetId || process.env.NEXT_PUBLIC_GOOGLE_SPREADSHEET_ID;
+      let spreadsheetId = null;
       
-      if (!spreadsheetId) throw new Error('스프레드시트 설정 필요');
+      if (configStr) {
+        try {
+          const userConfig = JSON.parse(configStr);
+          spreadsheetId = userConfig.spreadsheetId;
+          console.log('✅ localStorage에서 spreadsheetId 찾음:', spreadsheetId?.substring(0, 15) + '...');
+        } catch (e) {
+          console.error('Config parse error:', e);
+        }
+      }
+      
+      // ✅ 없으면 API에서 가져오기
+      if (!spreadsheetId) {
+        console.log('⚠️ localStorage 없음, API에서 가져옴...');
+        
+        // API로 현재 spreadsheetId 요청
+        const checkResponse = await fetch('/api/subscription/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userConfig: null }),
+        });
+        
+        if (!checkResponse.ok) {
+          throw new Error('스프레드시트 정보를 가져올 수 없습니다.');
+        }
+        
+        const checkData = await checkResponse.json();
+        
+        // API가 사용한 spreadsheetId를 반환하도록 수정 필요
+        // 임시: 에러 발생
+        throw new Error('스프레드시트 설정이 필요합니다. /setup 페이지에서 먼저 설정하세요.');
+      }
+
+      console.log('✅ spreadsheetId:', spreadsheetId.substring(0, 15) + '...');
 
       // 결제 정보 생성
       const response = await fetch('/api/subscription/create', {
@@ -34,14 +67,24 @@ export default function SubscriptionDialog({ cardCount, onClose, onSuccess }: Su
         body: JSON.stringify({
           customerName: '사용자',
           customerEmail: 'user@emember.app',
-          spreadsheetId, // ✅
+          spreadsheetId,
         }),
       });
 
-      if (!response.ok) throw new Error('결제 정보 생성 실패');
-      const paymentData = await response.json();
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || '결제 정보 생성에 실패했습니다.');
+      }
 
-      // PortOne 결제창
+      const paymentData = await response.json();
+      
+      console.log('결제 정보:', paymentData);
+
+      if (!paymentData.storeId || !paymentData.channelKey) {
+        throw new Error('결제 설정이 완료되지 않았습니다.');
+      }
+
+      // PortOne 결제창 호출
       const paymentResponse = await PortOne.requestPayment({
         storeId: paymentData.storeId,
         paymentId: paymentData.orderId,
@@ -54,22 +97,24 @@ export default function SubscriptionDialog({ cardCount, onClose, onSuccess }: Su
           fullName: '사용자',
           email: 'user@emember.app',
         },
-        customData: { // ✅ Webhook으로 전달
+        customData: {
           spreadsheetId: spreadsheetId,
           customerEmail: 'user@emember.app',
         },
       });
 
+      console.log('결제 응답:', paymentResponse);
+
       if (paymentResponse?.code != null) {
-        throw new Error(paymentResponse.message || '결제 실패');
+        throw new Error(paymentResponse.message || '결제에 실패했습니다.');
       }
 
-      alert('✅ 프리미엄 구독 완료!\n이제 무제한 저장 가능합니다.');
+      alert('✅ 프리미엄 구독이 완료되었습니다!\n이제 무제한으로 명함을 저장할 수 있습니다.');
       onSuccess();
 
     } catch (err: any) {
-      console.error('결제 오류:', err);
-      setError(err.message || '결제 중 오류 발생');
+      console.error('❌ 결제 오류:', err);
+      setError(err.message || '결제 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
@@ -83,10 +128,12 @@ export default function SubscriptionDialog({ cardCount, onClose, onSuccess }: Su
         </h2>
 
         <div className="bg-yellow-50 border-2 border-yellow-200 p-4 rounded-xl mb-6">
-          <p className="text-yellow-800 font-medium mb-2">⚠️ 무료 한도 초과</p>
+          <p className="text-yellow-800 font-medium mb-2">
+            ⚠️ 무료 한도 초과
+          </p>
           <p className="text-sm text-yellow-700">
-            현재 <strong>{cardCount}명</strong> 저장됨<br/>
-            무료는 5명까지, 더 저장하려면 프리미엄 필요
+            현재 <strong>{cardCount}명</strong>의 명함이 저장되어 있습니다.<br/>
+            무료는 5명까지만 가능하며, 더 저장하려면 프리미엄 구독이 필요합니다.
           </p>
         </div>
 
@@ -121,6 +168,16 @@ export default function SubscriptionDialog({ cardCount, onClose, onSuccess }: Su
         {error && (
           <div className="bg-red-50 border-2 border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">
             <strong>오류:</strong> {error}
+            {error.includes('설정') && (
+              <div className="mt-2">
+                <a 
+                  href="/setup" 
+                  className="text-blue-600 hover:underline font-semibold"
+                >
+                  → 설정 페이지로 이동
+                </a>
+              </div>
+            )}
           </div>
         )}
 
@@ -128,14 +185,14 @@ export default function SubscriptionDialog({ cardCount, onClose, onSuccess }: Su
           <button
             onClick={onClose}
             disabled={loading}
-            className="flex-1 bg-gray-200 text-gray-700 px-6 py-3 rounded-xl font-medium hover:bg-gray-300 disabled:opacity-50"
+            className="flex-1 bg-gray-200 text-gray-700 px-6 py-3 rounded-xl font-medium hover:bg-gray-300 disabled:opacity-50 transition-all"
           >
             나중에
           </button>
           <button
             onClick={handleSubscribe}
             disabled={loading}
-            className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-xl font-bold hover:shadow-lg disabled:opacity-50"
+            className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-xl font-bold hover:shadow-lg disabled:opacity-50 transition-all"
           >
             {loading ? '처리 중...' : '지금 구독하기'}
           </button>
