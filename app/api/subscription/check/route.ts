@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
       freeLimit: FREE_LIMIT,
       needsSubscription,
       hasSubscription,
+      spreadsheetId,
       message: needsSubscription && !hasSubscription
         ? `${cardCount}명 저장됨. 프리미엄 구독 필요.`
         : hasSubscription

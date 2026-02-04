@@ -17,97 +17,97 @@ export default function SubscriptionDialog({ cardCount, onClose, onSuccess }: Su
     setError(null);
 
     try {
-      // const PortOne = (window as any).PortOne;
-      // if (!PortOne) {
-      //   throw new Error('결제 모듈을 불러올 수 없습니다.');
-      // }
+      const PortOne = (window as any).PortOne;
+      if (!PortOne) {
+        throw new Error('결제 모듈을 불러올 수 없습니다.');
+      }
 
-      // // ✅ localStorage에서 먼저 확인
-      // const configStr = localStorage.getItem('emember_config');
-      // let spreadsheetId = null;
+      // ✅ localStorage에서 먼저 확인
+      const configStr = localStorage.getItem('emember_config');
+      let spreadsheetId = null;
       
-      // if (configStr) {
-      //   try {
-      //     const userConfig = JSON.parse(configStr);
-      //     spreadsheetId = userConfig.spreadsheetId;
-      //     console.log('✅ localStorage에서 spreadsheetId 찾음:', spreadsheetId?.substring(0, 15) + '...');
-      //   } catch (e) {
-      //     console.error('Config parse error:', e);
-      //   }
-      // }
+      if (configStr) {
+        try {
+          const userConfig = JSON.parse(configStr);
+          spreadsheetId = userConfig.spreadsheetId;
+          console.log('✅ localStorage에서 spreadsheetId 찾음:', spreadsheetId?.substring(0, 15) + '...');
+        } catch (e) {
+          console.error('Config parse error:', e);
+        }
+      }
       
-      // // ✅ 없으면 API에서 가져오기
-      // if (!spreadsheetId) {
-      //   console.log('⚠️ localStorage 없음, API에서 가져옴...');
+      // ✅ 없으면 API에서 가져오기
+      if (!spreadsheetId) {
+        console.log('⚠️ localStorage 없음, API에서 가져옴...');
         
-      //   // API로 현재 spreadsheetId 요청
-      //   const checkResponse = await fetch('/api/subscription/check', {
-      //     method: 'POST',
-      //     headers: { 'Content-Type': 'application/json' },
-      //     body: JSON.stringify({ userConfig: null }),
-      //   });
+        // API로 현재 spreadsheetId 요청
+        const checkResponse = await fetch('/api/subscription/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userConfig: null }),
+        });
         
-      //   if (!checkResponse.ok) {
-      //     throw new Error('스프레드시트 정보를 가져올 수 없습니다.');
-      //   }
+        if (!checkResponse.ok) {
+          throw new Error('스프레드시트 정보를 가져올 수 없습니다.');
+        }
         
-      //   const checkData = await checkResponse.json();
+        const checkData = await checkResponse.json();
         
-      //   // API가 사용한 spreadsheetId를 반환하도록 수정 필요
-      //   // 임시: 에러 발생
-      //   throw new Error('스프레드시트 설정이 필요합니다. /setup 페이지에서 먼저 설정하세요.');
-      // }
+        // API가 사용한 spreadsheetId를 반환하도록 수정 필요
+        // 임시: 에러 발생
+        throw new Error('스프레드시트 설정이 필요합니다. /setup 페이지에서 먼저 설정하세요.');
+      }
 
-      // console.log('✅ spreadsheetId:', spreadsheetId.substring(0, 15) + '...');
+      console.log('✅ spreadsheetId:', spreadsheetId.substring(0, 15) + '...');
 
-      // // 결제 정보 생성
-      // const response = await fetch('/api/subscription/create', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     customerName: '사용자',
-      //     customerEmail: 'user@emember.app',
-      //     spreadsheetId,
-      //   }),
-      // });
+      // 결제 정보 생성
+      const response = await fetch('/api/subscription/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName: '사용자',
+          customerEmail: 'user@emember.app',
+          spreadsheetId,
+        }),
+      });
 
-      // if (!response.ok) {
-      //   const errorData = await response.json();
-      //   throw new Error(errorData.error || '결제 정보 생성에 실패했습니다.');
-      // }
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || '결제 정보 생성에 실패했습니다.');
+      }
 
-      // const paymentData = await response.json();
+      const paymentData = await response.json();
       
-      // console.log('결제 정보:', paymentData);
+      console.log('결제 정보:', paymentData);
 
-      // if (!paymentData.storeId || !paymentData.channelKey) {
-      //   throw new Error('결제 설정이 완료되지 않았습니다.');
-      // }
+      if (!paymentData.storeId || !paymentData.channelKey) {
+        throw new Error('결제 설정이 완료되지 않았습니다.');
+      }
 
-      // // PortOne 결제창 호출
-      // const paymentResponse = await PortOne.requestPayment({
-      //   storeId: paymentData.storeId,
-      //   paymentId: paymentData.orderId,
-      //   orderName: paymentData.productName,
-      //   totalAmount: paymentData.amount,
-      //   currency: 'CURRENCY_KRW',
-      //   channelKey: paymentData.channelKey,
-      //   payMethod: 'CARD',
-      //   customer: {
-      //     fullName: '사용자',
-      //     email: 'user@emember.app',
-      //   },
-      //   customData: {
-      //     spreadsheetId: spreadsheetId,
-      //     customerEmail: 'user@emember.app',
-      //   },
-      // });
+      // PortOne 결제창 호출
+      const paymentResponse = await PortOne.requestPayment({
+        storeId: paymentData.storeId,
+        paymentId: paymentData.orderId,
+        orderName: paymentData.productName,
+        totalAmount: paymentData.amount,
+        currency: 'CURRENCY_KRW',
+        channelKey: paymentData.channelKey,
+        payMethod: 'CARD',
+        customer: {
+          fullName: '사용자',
+          email: 'user@emember.app',
+        },
+        customData: {
+          spreadsheetId: spreadsheetId,
+          customerEmail: 'user@emember.app',
+        },
+      });
 
-      // console.log('결제 응답:', paymentResponse);
+      console.log('결제 응답:', paymentResponse);
 
-      // if (paymentResponse?.code != null) {
-      //   throw new Error(paymentResponse.message || '결제에 실패했습니다.');
-      // }
+      if (paymentResponse?.code != null) {
+        throw new Error(paymentResponse.message || '결제에 실패했습니다.');
+      }
 
       // 1초 정도 대기 시간을 주어 자연스럽게 연출 (선택 사항)
       await new Promise((resolve) => setTimeout(resolve, 1000));
