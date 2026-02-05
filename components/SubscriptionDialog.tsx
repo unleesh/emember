@@ -52,10 +52,13 @@ export default function SubscriptionDialog({ cardCount, onClose, onSuccess }: Su
         }
         
         const checkData = await checkResponse.json();
-        
-        // API가 사용한 spreadsheetId를 반환하도록 수정 필요
-        // 임시: 에러 발생
-        throw new Error('스프레드시트 설정이 필요합니다. /setup 페이지에서 먼저 설정하세요.');
+
+        // 서버에서 사용 중인 spreadsheetId를 그대로 사용
+        spreadsheetId = checkData.spreadsheetId;
+
+        if (!spreadsheetId) {
+          throw new Error('스프레드시트 설정이 필요합니다. /setup 페이지에서 먼저 설정하세요.');
+        }
       }
 
       console.log('✅ spreadsheetId:', spreadsheetId.substring(0, 15) + '...');
