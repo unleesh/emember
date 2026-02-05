@@ -112,6 +112,33 @@ export default function SubscriptionDialog({ cardCount, onClose, onSuccess }: Su
         throw new Error(paymentResponse.message || '결제에 실패했습니다.');
       }
 
+      // ✅ 결제 완료 후 클라이언트에서도 구독 정보 저장 (Webhook 실패 시 Fallback)
+      try {
+        const orderId = paymentData.orderId;
+        console.log('💾 클라이언트에서 구독 정보 저장 시도...', { orderId, spreadsheetId: spreadsheetId.substring(0, 15) + '...' });
+        
+        const activateResponse = await fetch('/api/subscription/manual-activate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            spreadsheetId,
+            orderId,
+            customerEmail: 'user@emember.app',
+          }),
+        });
+
+        if (activateResponse.ok) {
+          console.log('✅ 클라이언트에서 구독 정보 저장 성공');
+        } else {
+          const errorData = await activateResponse.json();
+          console.warn('⚠️ 클라이언트 저장 실패 (Webhook에 의존):', errorData);
+          // Webhook이 처리할 것으로 기대하고 계속 진행
+        }
+      } catch (activateErr: any) {
+        console.warn('⚠️ 클라이언트 저장 중 오류 (Webhook에 의존):', activateErr);
+        // Webhook이 처리할 것으로 기대하고 계속 진행
+      }
+
       // 1초 정도 대기 시간을 주어 자연스럽게 연출 (선택 사항)
       await new Promise((resolve) => setTimeout(resolve, 1000));
 

@@ -99,7 +99,7 @@ export default function GoogleSheetsService({
 
   console.log('🔄 결제 완료, 구독 상태 확인 대기 중...');
   
-  const maxRetries = 10; // 5초간 재시도 (0.5초 간격)
+  const maxRetries = 15; // 7.5초간 재시도 (0.5초 간격) - 클라이언트 저장 + Webhook 대기
   let retryCount = 0;
   let hasSubscription = false;
 
@@ -116,6 +116,8 @@ export default function GoogleSheetsService({
         console.log(`🔄 구독 상태 확인 (${retryCount + 1}/${maxRetries}):`, {
           hasSubscription: checkResult.hasSubscription,
           spreadsheetId: checkResult.spreadsheetId?.substring(0, 15) + '...',
+          needsSubscription: checkResult.needsSubscription,
+          success: checkResult.success,
         });
         
         hasSubscription = checkResult.hasSubscription === true;
@@ -139,8 +141,15 @@ export default function GoogleSheetsService({
   }
 
   if (!hasSubscription) {
-    console.warn('⚠️ Webhook 처리 대기 시간 초과 (5초), 저장 시도');
-    console.warn('💡 만약 계속 문제가 발생하면 Vercel 로그에서 webhook 호출 여부를 확인하세요.');
+    console.warn('⚠️ Webhook 처리 대기 시간 초과 (7.5초), 저장 시도');
+    console.warn('💡 가능한 원인:');
+    console.warn('   1. PortOne Webhook이 호출되지 않음 → PortOne 대시보드에서 Webhook URL 확인');
+    console.warn('   2. Redis 연결 실패 → Vercel 로그에서 Redis 에러 확인');
+    console.warn('   3. spreadsheetId 불일치 → 결제 시 사용한 ID와 체크 시 사용한 ID 비교');
+    console.warn('💡 Vercel 로그에서 다음을 확인하세요:');
+    console.warn('   - /api/subscription/webhook 호출 여부');
+    console.warn('   - Redis 연결 에러');
+    console.warn('   - "✅ Subscription saved" 로그');
   }
 
   // 구독 완료 후 자동으로 저장 재시도
