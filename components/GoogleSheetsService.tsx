@@ -82,8 +82,67 @@ export default function GoogleSheetsService({
 };
 
 
-const handleSubscriptionSuccess = () => {
+  const handleSubscriptionSuccess = async () => {
   setShowSubscriptionDialog(false);
+  
+  // ✅ Webhook이 Redis에 구독 정보를 저장할 때까지 대기 (최대 5초)
+  const configStr = localStorage.getItem('emember_config');
+  let userConfig = null;
+  
+  if (configStr) {
+    try {
+      userConfig = JSON.parse(configStr);
+    } catch (e) {
+      console.error('Config parse error:', e);
+    }
+  }
+
+  console.log('🔄 결제 완료, 구독 상태 확인 대기 중...');
+  
+  const maxRetries = 10; // 5초간 재시도 (0.5초 간격)
+  let retryCount = 0;
+  let hasSubscription = false;
+
+  while (retryCount < maxRetries && !hasSubscription) {
+    try {
+      const checkResponse = await fetch('/api/subscription/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userConfig }),
+      });
+
+      if (checkResponse.ok) {
+        const checkResult = await checkResponse.json();
+        console.log(`🔄 구독 상태 확인 (${retryCount + 1}/${maxRetries}):`, {
+          hasSubscription: checkResult.hasSubscription,
+          spreadsheetId: checkResult.spreadsheetId?.substring(0, 15) + '...',
+        });
+        
+        hasSubscription = checkResult.hasSubscription === true;
+        
+        if (hasSubscription) {
+          console.log('✅ 구독 상태 확인됨, 저장 진행');
+          break;
+        }
+      } else {
+        console.warn(`⚠️ 구독 상태 확인 실패 (${checkResponse.status})`);
+      }
+    } catch (err) {
+      console.error('구독 상태 확인 중 오류:', err);
+    }
+
+    retryCount++;
+    if (retryCount < maxRetries) {
+      // 0.5초 대기 후 재시도
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+
+  if (!hasSubscription) {
+    console.warn('⚠️ Webhook 처리 대기 시간 초과 (5초), 저장 시도');
+    console.warn('💡 만약 계속 문제가 발생하면 Vercel 로그에서 webhook 호출 여부를 확인하세요.');
+  }
+
   // 구독 완료 후 자동으로 저장 재시도
   handleSave();
 };
