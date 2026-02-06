@@ -20,10 +20,10 @@ export async function POST(request: NextRequest) {
     }
 
     // 기본 값들
-    const FREE_LIMIT = 5;
+    // const FREE_LIMIT = 5;
     let cardCount = 0;
-    let needsSubscription = false;
     // 구독 필요없게 해둠 260205
+    const needsSubscription = false;
     let sheetsError: string | null = null;
 
     // Google Sheets에서 카드 개수 조회 (에러가 나도 전체 API가 500으로 죽지 않도록 분리)
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
       const rows = response.data.values || [];
       cardCount = Math.max(0, rows.length - 1);
-      needsSubscription = cardCount >= FREE_LIMIT;
+      // needsSubscription = cardCount >= FREE_LIMIT;
     } catch (sheetsErr: any) {
       console.error('Sheets read error in /api/subscription/check:', sheetsErr);
       sheetsError = sheetsErr?.message || 'Sheets 조회 중 오류';

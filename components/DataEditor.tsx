@@ -96,6 +96,9 @@ export default function DataEditor({ initialData, onSave, onBack }: DataEditorPr
 
       <div className="flex-1 overflow-auto p-4 sm:p-6 min-h-0">
         <div className="max-w-2xl mx-auto space-y-4">
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
+            명함의 형태에 따라 아직 성함 및 직책이 인식이 덜 되거나 잘 못 될 수 있습니다. 개선 중이니 보고 수정입력하시면 더 좋습니다. 개선하겠습니다!
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">👤 이름</label>
             <input

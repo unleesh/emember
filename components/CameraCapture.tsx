@@ -117,6 +117,9 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
             {isMobile ? '📱 후면 카메라' : '💻 웹캠'}
           </p>
         )}
+        <p className="text-xs text-amber-700 text-center mt-1">
+          흔들리지 않게 찍어야 인식이 잘 됩니다.
+        </p>
       </div>
 
       {/* 카메라 프리뷰 - 가변 */}
