@@ -67,17 +67,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       cardCount,
-      freeLimit: FREE_LIMIT,
+      // freeLimit: FREE_LIMIT,
       needsSubscription,
       hasSubscription,
       spreadsheetId,
       sheetsError,
-      message:
-        needsSubscription && !hasSubscription
-          ? `${cardCount}명 저장됨. 프리미엄 구독 필요.`
-          : hasSubscription
-          ? `프리미엄 (${cardCount}명)`
-          : `무료 (${cardCount}/${FREE_LIMIT}명)`,
+      // message:
+      //   needsSubscription && !hasSubscription
+      //     ? `${cardCount}명 저장됨. 프리미엄 구독 필요.`
+      //     : hasSubscription
+      //     ? `프리미엄 (${cardCount}명)`
+      //     : `무료 (${cardCount}/${FREE_LIMIT}명)`,
     });
   } catch (error: any) {
     console.error('Check error:', error);
