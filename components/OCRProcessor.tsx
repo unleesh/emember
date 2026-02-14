@@ -140,13 +140,20 @@ export default function OCRProcessor({ imageData, onComplete, onBack }: OCRProce
   };
 
   const extractBusinessCardInfo = (text: string): BusinessCardData => {
-  console.log("=== OCR 텍스트 ===");
+  console.log("=== OCR 원본 텍스트 ===");
   console.log(text);
+  console.log("===================");
 
   const lines = text
     .split("\n")
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
+
+  console.log("=== 라인별 텍스트 ===");
+  lines.forEach((line, idx) => {
+    console.log(`${idx}: "${line}"`);
+  });
+  console.log("===================");
 
   const data: BusinessCardData = {
     name: "",
@@ -160,115 +167,251 @@ export default function OCRProcessor({ imageData, onComplete, onBack }: OCRProce
   };
 
   // --------------------------
-  // 1) 이메일
+  // 1) 이메일 (E, M, T, W, F 등 모든 접두사 제거)
   // --------------------------
-  const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[A-Za-z]{2,}/;
-  const email = text.match(emailRegex);
-  if (email) data.email = email[0];
+  const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[A-Za-z]{2,}/g;
+  const emailMatches = text.match(emailRegex);
+  
+  if (emailMatches && emailMatches.length > 0) {
+    let cleanEmail = emailMatches[0];
+    
+    console.log("이메일 매칭:", emailMatches);
+    console.log("이메일 원본:", cleanEmail);
+    
+    // ✅ 모든 접두사 패턴 처리
+    const prefixWithSeparator = /^[EMTWF][\s:.\-]+/i;
+    if (prefixWithSeparator.test(cleanEmail)) {
+      const original = cleanEmail;
+      cleanEmail = cleanEmail.replace(prefixWithSeparator, '');
+      console.log(`✅ 접두사+구분자 제거: "${original}" → "${cleanEmail}"`);
+    } else {
+      const prefixPattern = /^[EMTWF]([a-z])/i;
+      if (prefixPattern.test(cleanEmail)) {
+        const original = cleanEmail;
+        cleanEmail = cleanEmail.replace(/^[EMTWF]/i, '');
+        console.log(`✅ 접두사 제거 (바로 소문자): "${original}" → "${cleanEmail}"`);
+      }
+    }
+    
+    console.log("✅ 최종 이메일:", cleanEmail);
+    data.email = cleanEmail;
+  }
 
   // --------------------------
-  // 2) 웹사이트
+  // 2) 전화번호 (M+82, M 010 등)
   // --------------------------
-  const websiteRegex = /(https?:\/\/|www\.)[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
-  const website = text.match(websiteRegex);
-  if (website) data.website = website[0].replace(/^www\./, "https://www.");
-
-  // --------------------------
-  // 3) 전화번호 (+82 변환 포함)
-  // --------------------------
-  const cleanNum = (num: string) =>
-    num.replace(/[^0-9]/g, ""); // 숫자만 남기기
+  const cleanNum = (num: string) => num.replace(/[^0-9]/g, "");
 
   let phone = "";
-
-  // +82 패턴
-  const intl = text.match(/\+82\s?10[\s.-]?\d{3,4}[\s.-]?\d{4}/);
-  if (intl) {
-    let digits = cleanNum(intl[0]); // 8210XXXXYYYY
-    digits = digits.replace(/^82/, "0"); // → 010xxxxYYYY
-    phone = digits.replace(/(\d{3})(\d{4})(\d{4})/, "$1-$2-$3");
-  }
-
-  // 기본 한국 휴대폰 (010)
-  if (!phone) {
-    const m = text.match(/010[\s.-]?\d{3,4}[\s.-]?\d{4}/);
-    if (m) {
-      let digits = cleanNum(m[0]);
+  
+  const intlPattern = /[MT]?\+?82\s?10[\s.\-]?\d{3,4}[\s.\-]?\d{4}/gi;
+  const intlMatch = text.match(intlPattern);
+  
+  if (intlMatch) {
+    let digits = cleanNum(intlMatch[0]);
+    console.log("✅ 국제번호 인식:", intlMatch[0], "→ 숫자:", digits);
+    
+    if (digits.startsWith('82')) {
+      digits = '0' + digits.substring(2);
+    }
+    
+    if (digits.startsWith('010') && digits.length >= 10) {
       phone = digits.replace(/(\d{3})(\d{4})(\d{4})/, "$1-$2-$3");
+      console.log("✅ 전화번호 변환:", phone);
     }
   }
-
+  
+  if (!phone) {
+    const phonePattern = /[MT]?\s?010[\s.\-]?\d{3,4}[\s.\-]?\d{4}/gi;
+    const phoneMatch = text.match(phonePattern);
+    
+    if (phoneMatch) {
+      const digits = cleanNum(phoneMatch[0]);
+      if (digits.length >= 10) {
+        phone = digits.replace(/(\d{3})(\d{4})(\d{4})/, "$1-$2-$3");
+        console.log("✅ 일반 전화번호:", phone);
+      }
+    }
+  }
+  
   if (phone) data.phone = phone;
 
   // --------------------------
-  // 4) 이름 (한글 2–4글자)
+  // 3) 웹사이트 (W 접두사 처리)
   // --------------------------
-  const nameCandidate = lines.find((l) => /^[가-힣]{2,4}$/.test(l));
-  if (nameCandidate) data.name = nameCandidate;
-
-  // --------------------------
-  // 5) 직책 (영문 + 한국어)
-  // --------------------------
-  const positionKeywords = [
-    "CEO", "CFO", "COO", "CTO", "CDO", "CMO", "CIO",
-    "Founder", "Co-founder", "Co-founder", "Co Founder",
-    "President", "Director", "Manager", "Lead", "Head",
-    "Executive", "Partner", "Principal", "Advisor",
-    "Engineer", "Designer", "Developer",
-    "대표", "이사", "상무", "부장", "팀장", "실장", "본부장", "센터장",
-  ];
-
   for (const line of lines) {
-    if (positionKeywords.some((kw) => line.toLowerCase().includes(kw.toLowerCase()))) {
-      data.position = line;
+    if (line.includes('@')) continue;
+    
+    let cleanLine = line.replace(/^W\s*/i, '');
+    
+    const urlMatch = cleanLine.match(/(https?:\/\/[^\s]+)/);
+    if (urlMatch) {
+      data.website = urlMatch[1];
+      console.log("✅ URL 발견:", data.website);
+      continue;
+    }
+    
+    const wwwMatch = cleanLine.match(/(www\.[^\s/]+)/);
+    if (wwwMatch) {
+      data.website = `https://${wwwMatch[1]}`;
+      console.log("✅ www 발견:", data.website);
+      continue;
+    }
+    
+    const domainPattern = /([a-z0-9-]+\.(?:com|kr|net|org|io|ai|co\.kr))/i;
+    const domainMatch = cleanLine.match(domainPattern);
+    
+    if (domainMatch) {
+      const domain = domainMatch[1];
+      data.website = `https://${domain}`;
+      console.log("✅ 도메인 발견:", data.website);
       break;
     }
   }
 
   // --------------------------
-  // 6) 회사명 (도메인 기반 + 한글 + 영문 조합)
+  // 4) 이름 (한글 2-4글자)
   // --------------------------
+  for (const line of lines) {
+    if (/^[가-힣]{2,4}$/.test(line)) {
+      data.name = line;
+      break;
+    }
+  }
+
+  // --------------------------
+  // 5) 직책 (키워드 확장)
+  // --------------------------
+  const positionKeywords = [
+    "CEO", "CFO", "COO", "CTO", "CDO", "CMO", "CIO",
+    "Founder", "Co-founder", "Director", "Manager", "Lead", "Head",
+    "Executive", "Partner", "Principal", "Advisor",
+    "Engineer", "Designer", "Developer", "Marketer",
+    "대표", "이사", "상무", "부장", "팀장", "실장", "본부장", "센터장",
+    "매니저", "심사역", "연구원", "컨설턴트", "전문위원", "수석",
+    "투자", "마케팅", "개발", "디자인", "기획", "운영", "인사", "재무",
+  ];
+
+  for (const line of lines) {
+    const lower = line.toLowerCase();
+    if (positionKeywords.some((kw) => lower.includes(kw.toLowerCase()))) {
+      if (!data.position) {
+        data.position = line;
+      } else if (line.includes('/')) {
+        data.position += ` ${line}`;
+      }
+      console.log("✅ 직책 발견:", line);
+      if (!line.includes('/')) break;
+    }
+  }
+
+  // --------------------------
+  // 6) 회사명 - 가장 긴 것 선택
+  // --------------------------
+  const excludeWords = [
+    data.name, data.position,
+    "Tel", "Mobile", "Fax", "Email", "CEO", "Director",
+    "서울", "경기", "강남", "도", "시", "구", "로", "길",
+    "TIPS", "운영사", "혁신",
+  ];
+
+  const isExcluded = (str: string) => {
+    if (!str || str.length < 2) return true;
+    if (str.includes('@') || /010/.test(str) || /\+82/.test(str)) return true;
+    return excludeWords.some(w => w && str.includes(w));
+  };
+
   const companyCandidates: string[] = [];
+  const corpCandidates: string[] = [];
 
-  // 이메일 도메인 기반
+  // ✅ (주) 패턴
+  for (const line of lines) {
+    const match1 = line.match(/([가-힣A-Za-z0-9&\s]{2,20})\s*\(주\)/);
+    const match2 = line.match(/\(주\)\s*([가-힣A-Za-z0-9&\s]{2,20})/);
+    
+    if (match1) {
+      const name = match1[1].trim();
+      if (!isExcluded(name)) {
+        corpCandidates.push(name);
+        console.log("✅ (주) 패턴:", name);
+      }
+    } else if (match2) {
+      const name = match2[1].trim();
+      if (!isExcluded(name)) {
+        corpCandidates.push(name);
+        console.log("✅ (주) 패턴:", name);
+      }
+    }
+  }
+
+  // ✅ 영문 회사명 (& 포함)
+  for (const line of lines) {
+    if (/^[A-Za-z][A-Za-z0-9&\s]{1,29}$/.test(line) && !isExcluded(line)) {
+      const trimmed = line.trim();
+      if (trimmed.length >= 2 && trimmed !== data.name) {
+        companyCandidates.push(trimmed);
+        console.log("✅ 영문 회사명 후보:", trimmed);
+      }
+    }
+  }
+
+  // ✅ 이메일 도메인
   if (data.email) {
-    const domain = data.email.split("@")[1].split(".")[0];
-    companyCandidates.push(domain);
+    const domain = data.email.split("@")[1]?.split(".")[0];
+    if (domain && domain.length >= 2) {
+      companyCandidates.push(domain);
+      console.log("✅ 이메일 도메인:", domain);
+    }
   }
 
-  // 한글 회사명
+  // ✅ 순수 한글
   for (const line of lines) {
-    if (/^[가-힣A-Za-z\s]{2,20}$/.test(line) && !/대표|이사|팀장/.test(line)) {
+    if (/^[가-힣]{2,10}$/.test(line) && !isExcluded(line)) {
       companyCandidates.push(line);
     }
   }
 
-  // 영문 회사명
-  for (const line of lines) {
-    if (/[A-Za-z]{2,}/.test(line) && line.length < 20) {
-      companyCandidates.push(line);
-    }
+  console.log("회사명 후보:", companyCandidates);
+
+  // ✅ 선택: 가장 긴 것
+  if (corpCandidates.length > 0) {
+    // (주) 패턴 최우선 (가장 긴 것)
+    data.company = corpCandidates.sort((a, b) => b.length - a.length)[0];
+    console.log("✅ (주) 패턴 선택 (가장 긴 것):", data.company);
+  } else if (companyCandidates.length > 0) {
+    // 일반 후보 중 가장 긴 것
+    data.company = companyCandidates.sort((a, b) => b.length - a.length)[0];
+    console.log("✅ 회사명 선택 (가장 긴 것):", data.company);
   }
 
-  // 회사명 선택
-  if (companyCandidates.length > 0) {
-    const unique = [...new Set(companyCandidates)];
-    data.company = unique[0];
+  // 정제
+  if (data.company) {
+    data.company = data.company
+      .replace(/\(주\)/g, '')
+      .replace(/주식회사/g, '')
+      .trim();
   }
 
-  // ⭐ 요구사항: 회사명은 항상 "큐리에이아이"로 통일
-  data.company = "큐리에이아이";
-
   // --------------------------
-  // 7) 주소 (2줄 이상이면 자동 합쳐서 1줄로 변환)
+  // 7) 주소
   // --------------------------
-  const addressLines = lines.filter((l) => /(도|시|구|동|로|길)/.test(l));
+  const addressLines = lines.filter((l) => 
+    /(시|구|동|로|길|빌딩|층|플러스)/.test(l) && !l.includes('@')
+  );
 
   if (addressLines.length > 0) {
-    // 여러 줄 → 한 줄로 병합
-    const merged = addressLines.join(" ").replace(/\s+/g, " ").trim();
-    data.address = merged;
+    data.address = addressLines.join(" ").replace(/\s+/g, " ").trim();
   }
+
+  console.log("=== 최종 결과 ===");
+  console.log("이름:", data.name);
+  console.log("회사:", data.company);
+  console.log("직책:", data.position);
+  console.log("이메일:", data.email);
+  console.log("전화:", data.phone);
+  console.log("웹사이트:", data.website);
+  console.log("주소:", data.address);
+  console.log("===============");
 
   return data;
 };
