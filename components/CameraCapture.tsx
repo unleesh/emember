@@ -5,6 +5,7 @@ import { useRef, useState, useEffect } from 'react';
 interface CameraCaptureProps {
   onCapture: (imageData: string) => void;
   onClose: () => void;
+  session: any; //
 }
 
 export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {

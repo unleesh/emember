@@ -1,132 +1,100 @@
+// app/api/vision/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
-  const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
-  
-  // 디버깅 로그 (임시)
-  console.log('ENV check:', {
-    keyExists: !!API_KEY,
-    keyLength: API_KEY?.length,
-    firstChars: API_KEY?.substring(0, 10),
-    lastChars: API_KEY?.substring(API_KEY?.length - 10),
-  });
-  
   try {
-    const body = await request.json();
-    const { imageData } = body;
+    // ✅ 세션 확인
+    const session = await getServerSession(authOptions);
     
-    console.log('Request body keys:', Object.keys(body));
-    console.log('imageData exists:', !!imageData);
-    console.log('imageData length:', imageData?.length);
-    
-    const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
-
-    if (!API_KEY) {
-      console.error('API Key not found in environment');
-      return NextResponse.json({ error: 'API Key not configured' }, { status: 500 });
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Please login' },
+        { status: 401 }
+      );
     }
-    
-    console.log('API Key exists:', !!API_KEY);
 
-    // 이미지 데이터 검증
+    const { imageData } = await request.json();
+
     if (!imageData) {
-      console.error('No imageData provided');
-      return NextResponse.json({ error: 'No image data provided' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'No image data provided' },
+        { status: 400 }
+      );
     }
 
-    if (!imageData.startsWith('data:image/')) {
-      console.error('Invalid image data format. Starts with:', imageData.substring(0, 50));
-      return NextResponse.json({ error: 'Invalid image data format' }, { status: 400 });
+    // ✅ OAuth 토큰 가져오기
+    // @ts-ignore
+    const accessToken = session.accessToken;
+
+    if (!accessToken) {
+      return NextResponse.json(
+        { error: 'No access token available' },
+        { status: 401 }
+      );
     }
 
-    const base64Image = imageData.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, '');
-    
-    console.log('Base64 image length after strip:', base64Image.length);
-    
-    // Base64 검증
-    if (base64Image.length < 100) {
-      console.error('Base64 image too short');
-      return NextResponse.json({ error: 'Image data too short' }, { status: 400 });
-    }
+    // Base64 이미지 처리
+    const base64Image = imageData.replace(/^data:image\/\w+;base64,/, '');
 
-    const requestBody = {
-      requests: [
-        {
-          image: {
-            content: base64Image,
-          },
-          features: [
-            {
-              type: 'DOCUMENT_TEXT_DETECTION',
-            },
-          ],
-          imageContext: {
-            languageHints: ['ko', 'en'],
-          },
-        },
-      ],
-    };
-
-    console.log('Calling Vision API...');
-    console.log('Request body structure:', JSON.stringify({
-      requests: [{
-        image: { content: '[BASE64_DATA_LENGTH:' + base64Image.length + ']' },
-        features: requestBody.requests[0].features,
-        imageContext: requestBody.requests[0].imageContext,
-      }]
-    }));
-
-    const response = await fetch(
-      `https://vision.googleapis.com/v1/images:annotate?key=${API_KEY}`,
+    // ✅ Google Vision REST API 직접 호출
+    const visionResponse = await fetch(
+      'https://vision.googleapis.com/v1/images:annotate',
       {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({
+          requests: [
+            {
+              image: {
+                content: base64Image,
+              },
+              features: [
+                {
+                  type: 'TEXT_DETECTION',
+                  maxResults: 1,
+                },
+              ],
+            },
+          ],
+        }),
       }
     );
 
-    console.log('Vision API response status:', response.status);
-    console.log('Vision API response headers:', Object.fromEntries(response.headers.entries()));
-
-    const responseText = await response.text();
-    console.log('Vision API raw response:', responseText);
-
-    let result;
-    try {
-      result = JSON.parse(responseText);
-    } catch (e) {
-      console.error('Failed to parse Vision API response as JSON');
+    if (!visionResponse.ok) {
+      const errorText = await visionResponse.text();
+      console.error('Vision API Error:', errorText);
       return NextResponse.json(
-        { error: 'Invalid JSON response from Vision API', rawResponse: responseText },
-        { status: 500 }
+        { error: 'Vision API failed', details: errorText },
+        { status: visionResponse.status }
       );
     }
 
-    if (!response.ok) {
-      console.error('Vision API error response:', JSON.stringify(result, null, 2));
-      return NextResponse.json(
-        { 
-          error: 'Vision API failed', 
-          status: response.status,
-          details: result,
-          message: result.error?.message || 'Unknown error'
+    const visionData = await visionResponse.json();
+
+    // ✅ 기존 포맷으로 변환
+    return NextResponse.json({
+      success: true,
+      responses: [
+        {
+          fullTextAnnotation: {
+            text: visionData.responses?.[0]?.fullTextAnnotation?.text || '',
+          },
         },
-        { status: response.status }
-      );
-    }
-
-    console.log('Vision API success!');
-    console.log('Response has data:', !!result.responses?.[0]);
-    
-    return NextResponse.json(result);
+      ],
+    });
 
   } catch (error: any) {
-    console.error('Server error in vision route:', error);
-    console.error('Error stack:', error.stack);
+    console.error('Vision API Error:', error);
     return NextResponse.json(
-      { error: error.message || 'Unknown server error', stack: error.stack },
+      {
+        error: 'Vision API failed',
+        message: error.message,
+      },
       { status: 500 }
     );
   }

@@ -1,95 +1,200 @@
+// app/api/sheets/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { google } from 'googleapis';
 
 export async function POST(request: NextRequest) {
   try {
-    const data = await request.json();
-
-    let privateKey = process.env.GOOGLE_PRIVATE_KEY;
+    const session = await getServerSession(authOptions);
     
-    if (!privateKey) {
-      return NextResponse.json(
-        { error: 'GOOGLE_PRIVATE_KEY가 설정되지 않았습니다. Vercel 환경 변수를 확인하세요.' },
-        { status: 500 }
-      );
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    privateKey = privateKey.replace(/\\n/g, '\n');
-    if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
-      privateKey = privateKey.slice(1, -1).replace(/\\n/g, '\n');
+    // @ts-ignore
+    const accessToken = session.accessToken;
+
+    if (!accessToken) {
+      return NextResponse.json({ error: 'No access token' }, { status: 401 });
     }
 
-    const auth = new google.auth.GoogleAuth({
-      credentials: {
-        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-        private_key: privateKey,
-      },
-      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-    });
+    const { data } = await request.json();
+
+    // OAuth 클라이언트 설정
+    const auth = new google.auth.OAuth2();
+    auth.setCredentials({ access_token: accessToken });
 
     const sheets = google.sheets({ version: 'v4', auth });
-    const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
+    const drive = google.drive({ version: 'v3', auth });
 
-    if (!spreadsheetId) {
-      return NextResponse.json(
-        { error: 'GOOGLE_SPREADSHEET_ID가 설정되지 않았습니다.' },
-        { status: 500 }
-      );
-    }
+    // 사용자의 스프레드시트 ID 찾기 or 생성
+    let spreadsheetId = await findOrCreateSpreadsheet(drive, sheets, session.user.email);
 
-    const getResponse = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: 'Sheet1!A1:I1',
-    });
-
-    const existingValues = getResponse.data.values || [];
-
-    if (existingValues.length === 0) {
-      await sheets.spreadsheets.values.update({
-        spreadsheetId,
-        range: 'Sheet1!A1:I1',
-        valueInputOption: 'RAW',
-        requestBody: {
-          values: [['날짜', '이름', '회사명', '직책', '이메일', '전화번호', '주소', '웹사이트', '개인화된 메시지']],
-        },
-      });
-    }
-
-    const timestamp = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+    // 데이터 추가
     const values = [[
-      timestamp,
+      new Date().toLocaleString('ko-KR'),
       data.name || '',
       data.company || '',
       data.position || '',
       data.email || '',
       data.phone || '',
-      data.address || '',
       data.website || '',
-      data.personalizedMessage || '',
+      data.address || '',
     ]];
 
     await sheets.spreadsheets.values.append({
       spreadsheetId,
-      range: 'Sheet1!A:I',
+      range: '명함!A:H',
       valueInputOption: 'RAW',
-      insertDataOption: 'INSERT_ROWS',
-      requestBody: {
-        values,
-      },
+      requestBody: { values },
     });
-
-    const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
 
     return NextResponse.json({
       success: true,
-      url: spreadsheetUrl,
+      spreadsheetId,
+      spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`,
     });
 
   } catch (error: any) {
-    console.error('Sheets API error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to save to sheets' },
-      { status: 500 }
-    );
+    console.error('Sheets API Error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
+
+// 스프레드시트 찾기 or 생성
+async function findOrCreateSpreadsheet(drive: any, sheets: any, userEmail: string) {
+  const SPREADSHEET_NAME = '명함 관리';
+
+  try {
+    // 1. 기존 스프레드시트 찾기
+    const response = await drive.files.list({
+      q: `name='${SPREADSHEET_NAME}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`,
+      fields: 'files(id, name)',
+      pageSize: 1,
+    });
+
+    if (response.data.files && response.data.files.length > 0) {
+      console.log('✅ 기존 스프레드시트 발견:', response.data.files[0].id);
+      return response.data.files[0].id;
+    }
+
+    // 2. 없으면 새로 생성
+    console.log('📝 새 스프레드시트 생성 중...');
+    
+    const createResponse = await sheets.spreadsheets.create({
+      requestBody: {
+        properties: {
+          title: SPREADSHEET_NAME,
+        },
+        sheets: [
+          {
+            properties: {
+              title: '명함',
+              gridProperties: {
+                rowCount: 1000,
+                columnCount: 8,
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    const spreadsheetId = createResponse.data.spreadsheetId!;
+    const sheetId = createResponse.data.sheets![0].properties!.sheetId!;
+
+    console.log('✅ 스프레드시트 생성 완료:', spreadsheetId);
+    console.log('✅ 시트 ID:', sheetId);
+
+    // ✅ 헤더 추가 (먼저)
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: '명함!A1:H1',
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: [[
+          '등록일',
+          '이름',
+          '회사명',
+          '직책',
+          '이메일',
+          '전화번호',
+          '웹사이트',
+          '주소',
+        ]],
+      },
+    });
+
+    // ✅ 헤더 스타일링 (올바른 sheetId 사용)
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            repeatCell: {
+              range: {
+                sheetId: sheetId, // ✅ 올바른 sheetId 사용!
+                startRowIndex: 0,
+                endRowIndex: 1,
+                startColumnIndex: 0,
+                endColumnIndex: 8,
+              },
+              cell: {
+                userEnteredFormat: {
+                  backgroundColor: {
+                    red: 0.2,
+                    green: 0.5,
+                    blue: 0.8,
+                  },
+                  textFormat: {
+                    foregroundColor: {
+                      red: 1,
+                      green: 1,
+                      blue: 1,
+                    },
+                    bold: true,
+                    fontSize: 11,
+                  },
+                  horizontalAlignment: 'CENTER',
+                  verticalAlignment: 'MIDDLE',
+                },
+              },
+              fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)',
+            },
+          },
+          // ✅ 헤더 행 고정
+          {
+            updateSheetProperties: {
+              properties: {
+                sheetId: sheetId,
+                gridProperties: {
+                  frozenRowCount: 1,
+                },
+              },
+              fields: 'gridProperties.frozenRowCount',
+            },
+          },
+          // ✅ 열 너비 자동 조정
+          {
+            autoResizeDimensions: {
+              dimensions: {
+                sheetId: sheetId,
+                dimension: 'COLUMNS',
+                startIndex: 0,
+                endIndex: 8,
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    console.log('✅ 스타일링 완료');
+    return spreadsheetId;
+
+  } catch (error) {
+    console.error('❌ 스프레드시트 생성 실패:', error);
+    throw error;
   }
 }

@@ -1,30 +1,25 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
+// app/layout.tsx
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css';
+import { Providers } from './providers';
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: "emember - 명함 스캐너",
-  description: "AI로 자동으로 정보를 추출하고 Google Sheets에 저장합니다",
+  title: '명함 관리 - AI 자동 인식',
+  description: 'Google Vision으로 명함을 스캔하고 스프레드시트에 자동 저장',
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="ko">
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <script 
-          src="https://cdn.portone.io/v2/browser-sdk.js"
-          defer
-        />
-      </head>
       <body className={inter.className}>
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
