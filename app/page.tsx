@@ -16,6 +16,7 @@ export interface BusinessCardData {
   website: string;
   address: string;
   rawText?: string;
+  personalizedMessage?: string;
 }
 
 export default function Home() {
