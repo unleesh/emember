@@ -39,7 +39,7 @@ export default function Home() {
           <div className="text-center mb-8">
             <div className="text-6xl mb-4">📇</div>
             <h1 className="text-4xl font-bold text-gray-900 mb-2">
-              명함 관리
+              명함 관리 emember
             </h1>
             <p className="text-gray-600">
               AI로 명함을 스캔하고<br/>

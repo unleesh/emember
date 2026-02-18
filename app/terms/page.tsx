@@ -9,7 +9,7 @@ export default function TermsOfService() {
           <section>
             <p className="text-sm text-gray-500 mb-6">최종 업데이트: 2026년 2월 18일</p>
             <p className="mb-4">
-              명함 관리 서비스(이하 "서비스")를 이용해 주셔서 감사합니다. 
+              명함 관리(emember) 서비스(이하 "서비스")를 이용해 주셔서 감사합니다. 
               본 약관은 서비스 이용과 관련된 권리와 의무, 책임사항을 규정합니다.
             </p>
           </section>
@@ -17,7 +17,7 @@ export default function TermsOfService() {
           <section>
             <h2 className="text-xl font-semibold text-gray-900 mb-4">제1조 (목적)</h2>
             <p>
-              본 약관은 명함 관리 서비스(이하 "서비스")의 이용과 관련하여 
+              본 약관은 명함 관리(emember) 서비스(이하 "서비스")의 이용과 관련하여 
               서비스 제공자와 이용자 간의 권리, 의무 및 책임사항, 기타 필요한 사항을 규정함을 목적으로 합니다.
             </p>
           </section>

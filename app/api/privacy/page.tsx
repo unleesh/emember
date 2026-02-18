@@ -9,7 +9,7 @@ export default function PrivacyPolicy() {
           <section>
             <p className="text-sm text-gray-500 mb-6">최종 업데이트: 2026년 2월 18일</p>
             <p className="mb-4">
-              명함 관리 서비스(이하 "서비스")는 사용자의 개인정보를 중요하게 생각하며, 
+              명함 관리(emember) 서비스(이하 "서비스")는 사용자의 개인정보를 중요하게 생각하며, 
               개인정보보호법 및 관련 법령을 준수하고 있습니다.
             </p>
           </section>
