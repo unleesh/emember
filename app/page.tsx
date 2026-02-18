@@ -5,7 +5,18 @@ import { useState } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import CameraCapture from '@/components/CameraCapture';
 import OCRProcessor from '@/components/OCRProcessor';
-import type { BusinessCardData } from '@/types';
+
+// ✅ 타입 정의 (파일 상단에 추가)
+interface BusinessCardData {
+  name: string;
+  company: string;
+  position: string;
+  email: string;
+  phone: string;
+  website: string;
+  address: string;
+  rawText?: string;
+}
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -80,7 +91,6 @@ export default function Home() {
             Google 계정으로 시작하기
           </button>
 
-          {/* ✅ 약관 링크 */}
           <p className="text-center text-xs text-gray-500 mt-4">
             로그인하면{' '}
             <a 
