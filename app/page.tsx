@@ -7,7 +7,7 @@ import CameraCapture from '@/components/CameraCapture';
 import OCRProcessor from '@/components/OCRProcessor';
 
 // ✅ 타입 정의 (파일 상단에 추가)
-interface BusinessCardData {
+export interface BusinessCardData {
   name: string;
   company: string;
   position: string;
