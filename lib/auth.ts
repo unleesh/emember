@@ -9,14 +9,13 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: {
         params: {
-          // ✅ Vision API 권한 추가
+          // ✅ Non-sensitive 범위만 사용 (심사 불필요)
           scope: [
             'openid',
             'email',
             'profile',
-            'https://www.googleapis.com/auth/spreadsheets',
+            // ✅ 앱이 생성한 파일만 접근 (Non-sensitive)
             'https://www.googleapis.com/auth/drive.file',
-            'https://www.googleapis.com/auth/cloud-vision', // ← 추가!
           ].join(' '),
           access_type: 'offline',
           prompt: 'consent',

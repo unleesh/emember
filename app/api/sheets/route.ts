@@ -21,14 +21,16 @@ export async function POST(request: NextRequest) {
 
     const { data } = await request.json();
 
-    // OAuth 클라이언트 설정
+    // ✅ OAuth 클라이언트 설정
     const auth = new google.auth.OAuth2();
     auth.setCredentials({ access_token: accessToken });
 
+    // ✅ drive.file 범위로 충분!
+    // 앱이 생성한 스프레드시트는 접근 가능
     const sheets = google.sheets({ version: 'v4', auth });
     const drive = google.drive({ version: 'v3', auth });
 
-    // 사용자의 스프레드시트 ID 찾기 or 생성
+    // 스프레드시트 찾기 or 생성
     let spreadsheetId = await findOrCreateSpreadsheet(drive, sheets, session.user.email);
 
     // 데이터 추가
@@ -62,12 +64,12 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// 스프레드시트 찾기 or 생성
+// ✅ 스프레드시트 찾기 or 생성
 async function findOrCreateSpreadsheet(drive: any, sheets: any, userEmail: string) {
   const SPREADSHEET_NAME = '명함 관리';
 
   try {
-    // 1. 기존 스프레드시트 찾기
+    // ✅ drive.file 범위: 앱이 생성한 파일만 검색 가능
     const response = await drive.files.list({
       q: `name='${SPREADSHEET_NAME}' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`,
       fields: 'files(id, name)',
@@ -79,7 +81,7 @@ async function findOrCreateSpreadsheet(drive: any, sheets: any, userEmail: strin
       return response.data.files[0].id;
     }
 
-    // 2. 없으면 새로 생성
+    // 새로 생성
     console.log('📝 새 스프레드시트 생성 중...');
     
     const createResponse = await sheets.spreadsheets.create({
@@ -104,10 +106,7 @@ async function findOrCreateSpreadsheet(drive: any, sheets: any, userEmail: strin
     const spreadsheetId = createResponse.data.spreadsheetId!;
     const sheetId = createResponse.data.sheets![0].properties!.sheetId!;
 
-    console.log('✅ 스프레드시트 생성 완료:', spreadsheetId);
-    console.log('✅ 시트 ID:', sheetId);
-
-    // ✅ 헤더 추가 (먼저)
+    // 헤더 추가
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: '명함!A1:H1',
@@ -126,7 +125,7 @@ async function findOrCreateSpreadsheet(drive: any, sheets: any, userEmail: strin
       },
     });
 
-    // ✅ 헤더 스타일링 (올바른 sheetId 사용)
+    // 헤더 스타일링
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId,
       requestBody: {
@@ -134,7 +133,7 @@ async function findOrCreateSpreadsheet(drive: any, sheets: any, userEmail: strin
           {
             repeatCell: {
               range: {
-                sheetId: sheetId, // ✅ 올바른 sheetId 사용!
+                sheetId: sheetId,
                 startRowIndex: 0,
                 endRowIndex: 1,
                 startColumnIndex: 0,
@@ -163,7 +162,6 @@ async function findOrCreateSpreadsheet(drive: any, sheets: any, userEmail: strin
               fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)',
             },
           },
-          // ✅ 헤더 행 고정
           {
             updateSheetProperties: {
               properties: {
@@ -175,7 +173,6 @@ async function findOrCreateSpreadsheet(drive: any, sheets: any, userEmail: strin
               fields: 'gridProperties.frozenRowCount',
             },
           },
-          // ✅ 열 너비 자동 조정
           {
             autoResizeDimensions: {
               dimensions: {
